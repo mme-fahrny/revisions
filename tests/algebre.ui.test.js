@@ -73,7 +73,7 @@ async function glisserAuDoigt(page, selA, selB) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
   // Chromium attend la fin d'un éventuel double toucher avant le toucher suivant
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(1200);
 }
 
 /* ---------- manipulation des outils visuels ---------- */
@@ -186,14 +186,18 @@ async function repondre(page, juste, ctx) {
     var q = window.AlgebreApp.questionCourante();
     var ex = q.exemples();
     var r = { mode: q.mode, objectif: q.objectif, visuel: q.visuel ? q.visuel.type : null };
+    // sans exemple de réponse fausse (contre-exemple : toute valeur convient), on répond juste
+    if (!juste && q.mode !== 'choix' && !ex.faux.length) juste = true;
+    r.juste = juste;
     if (q.mode === 'choix') r.index = q.choix.findIndex(function (c) { return c.juste === juste; });
-    else r.texte = juste ? ex.justes[0] : (ex.faux[0] || '123456');
+    else r.texte = juste ? ex.justes[0] : ex.faux[0];
     return r;
   }, juste);
   if (info.mode === 'choix') await toucher(page, 'label[for="choix-' + info.index + '"]');
   else await page.fill('#reponse', info.texte);
   await toucher(page, '#verifier');
   var classe = await page.getAttribute('#retour', 'class');
+  juste = info.juste;
   verifier(!/info/.test(classe), 'réponse jugée illisible (' + ctx + ' ' + info.objectif + ') : ' + JSON.stringify(info) + ' → ' + await page.textContent('#retour'));
   verifier(juste ? /juste/.test(classe) : /faux/.test(classe), 'verdict inattendu (' + ctx + ' ' + info.objectif + ', attendu ' + (juste ? 'juste' : 'faux') + ') : ' + JSON.stringify(info) + ' → ' + await page.textContent('#retour'));
   verifier(await page.locator('.correction').count() === 1, 'correction absente (' + info.objectif + ')');
@@ -207,28 +211,30 @@ async function serieComplete(page, module, ctx) {
   await toucher(page, 'text=Tout cocher');
   await toucher(page, '#commencer');
   await page.waitForSelector('#verifier');
+  var nbJustes = 0;
   for (var i = 0; i < 10; i++) {
     await pasDeDefilement(page, ctx + ' ' + module + ' question ' + (i + 1));
     if (i === 2) await capture(page, ctx + '-' + module + '-q3');
     var vis = await page.evaluate(function () { var q = AlgebreApp.questionCourante(); return q.visuel ? q.visuel.type : null; });
     if (vis) await manipulerVisuel(page, vis, ctx + ' ' + module + ' q' + (i + 1));
-    await repondre(page, i % 2 === 0, ctx + ' ' + module);
+    if ((await repondre(page, i % 2 === 0, ctx + ' ' + module)).juste) nbJustes++;
     await pasDeDefilement(page, ctx + ' ' + module + ' correction ' + (i + 1));
     if (i === 3) await capture(page, ctx + '-' + module + '-correction');
     await toucher(page, '#suivant');
   }
   await page.waitForSelector('.table-bilan');
-  verifier(/^5 \/ 10/.test((await page.textContent('.score')).trim()), 'score inattendu : ' + await page.textContent('.score'));
+  verifier((await page.textContent('.score')).trim().indexOf(nbJustes + ' / 10') === 0, 'score inattendu : ' + await page.textContent('.score'));
   await pasDeDefilement(page, ctx + ' ' + module + ' bilan');
   await capture(page, ctx + '-' + module + '-bilan');
   await toucher(page, '#refaire');
-  for (var k = 0; k < 5; k++) {
+  for (var k = 0; k < 10 - nbJustes; k++) {
     await page.waitForSelector('#verifier');
     await repondre(page, true, ctx + ' ' + module + ' refaire');
     await toucher(page, '#suivant');
   }
   await page.waitForSelector('.table-bilan');
-  verifier(/^5 \/ 5/.test((await page.textContent('.score')).trim()), 'bilan après « Refaire » : ' + await page.textContent('.score'));
+  var rat = 10 - nbJustes;
+  verifier((await page.textContent('.score')).trim().indexOf(rat + ' / ' + rat) === 0, 'bilan après « Refaire » : ' + await page.textContent('.score'));
   await toucher(page, '#autres-modules');
 }
 
