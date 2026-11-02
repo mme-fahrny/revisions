@@ -124,6 +124,18 @@ d'affichage de `assets/maths.js` (colonne de droite).
 | 6 | Nombres relatifs (9e) : parenthèses et signe | `(+ 5)`, `(– 3)` ; écriture simplifiée `5`, `– 3` | `(+ 5)`, `(– 3)`, `5`, `-3` | `formaterRelatif(x)`, `formaterRelatif(x, { parentheses: false })` |
 | 7 | Ensembles de nombres | `ℕ`, `ℤ`, `𝔻` (décimaux), `ℚ`, `ℝ` | `ℝ` ou `R` pour S = ℝ | `Maths.ENSEMBLES` |
 
+### Années et niveaux
+
+- **Mathématiques** : niveau 1 et niveau 2 dans les trois années (9e, 10e, 11e).
+  Utiliser `Profil.get().niveau`.
+- **Sciences de la nature** : la 9e est un **tronc commun, sans niveaux** ;
+  les niveaux 1 et 2 n'existent qu'en 10e et 11e. Utiliser
+  `Profil.niveauSciences()`, qui renvoie `'tronc commun'` en 9e.
+- Une appli de sciences de 9e **ne demande jamais le niveau** et n'affiche
+  ni « niveau 1 » ni « niveau 2 » : ses exercices sont les mêmes pour tous
+  les élèves de 9e. Le profil (année + niveau) reste choisi une seule fois
+  pour tout le site ; le niveau choisi en 9e sert uniquement en maths.
+
 Autres écritures : puissances `x²`, `(– 3)⁴`, `10⁻³` (`formaterPuissance`) ;
 notation scientifique `3,2 · 10⁴` (`formaterNotationScientifique`) ; racines
 `√2`, `∛8`, `3√(x + 1)` (`formaterRacine`) ; ensemble vide `S = { }` ;
@@ -153,6 +165,7 @@ exemples `(2 ; – 3)` et `(– 3)` fournis).
 | `Profil.onChange(fn)` | `fn(profil)` à chaque changement ; renvoie une fonction de désabonnement |
 | `Profil.ouvrir()` | ouvre la fenêtre de choix |
 | `Profil.texte()` | « 10e · niveau 2 » |
+| `Profil.niveauSciences()` | niveau pour une appli de sciences : `'tronc commun'` en 9e, `1` ou `2` en 10e et 11e, `null` sans profil |
 
 Le script remplit automatiquement l'élément `[data-profil]` de l'en-tête et
 ouvre la fenêtre au premier passage (`<body data-profil-auto="non">` pour

@@ -24,6 +24,13 @@
  *                           renvoie une fonction pour se désabonner
  *   Profil.ouvrir()         ouvre la fenêtre de choix
  *   Profil.texte(profil?)   « 10e · niveau 2 »
+ *   Profil.niveauSciences(profil?)
+ *                           niveau à utiliser dans une appli de SCIENCES :
+ *                           'tronc commun' en 9e (pas de niveaux en sciences),
+ *                           1 ou 2 (niveau choisi) en 10e et 11e,
+ *                           null si aucun profil n'est choisi.
+ *                           En mathématiques, utiliser Profil.get().niveau
+ *                           (niveaux 1 et 2 dans les trois années).
  *   Profil.ANNEES, Profil.NIVEAUX
  *
  * Attribut facultatif sur <body> : data-profil-auto="non" pour ne pas
@@ -35,6 +42,7 @@
   var CLE = 'revisions.profil';
   var ANNEES = [9, 10, 11];
   var NIVEAUX = [1, 2];
+  var TRONC_COMMUN = 'tronc commun';
   var enMemoire = null;
   var abonnes = [];
 
@@ -92,6 +100,18 @@
   function texte(p) {
     p = p === undefined ? get() : p;
     return p ? p.annee + 'e · niveau ' + p.niveau : 'aucun profil choisi';
+  }
+
+  /**
+   * Niveau pour les sciences de la nature : la 9e est un tronc commun sans
+   * niveaux ; les niveaux 1 et 2 n'existent qu'en 10e et 11e.
+   * Renvoie 'tronc commun', 1, 2, ou null si aucun profil n'est choisi.
+   * Le choix du niveau fait en 9e (utile en maths) est simplement ignoré.
+   */
+  function niveauSciences(p) {
+    p = p === undefined ? get() : valide(p);
+    if (!p) return null;
+    return p.annee === 9 ? TRONC_COMMUN : p.niveau;
   }
 
   /* Synchronisation entre onglets ouverts */
@@ -233,6 +253,8 @@
     onChange: onChange,
     ouvrir: ouvrir,
     texte: texte,
+    niveauSciences: niveauSciences,
+    TRONC_COMMUN: TRONC_COMMUN,
     ANNEES: ANNEES.slice(),
     NIVEAUX: NIVEAUX.slice()
   };
