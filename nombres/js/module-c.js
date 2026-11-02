@@ -29,13 +29,26 @@
    * Droite numérique
    * ===================================================================== */
 
+  /** Deux nombres entiers écrits sous la droite (0 s'il est visible), pour pouvoir lire les graduations. */
+  function etiquettesDroite(min, max, pas) {
+    var entiers = [];
+    for (var e = Math.ceil(min); e <= max + 1e-9; e++) entiers.push(e);
+    if (pas === 1) {
+      var t = entiers.filter(function (x) { return x === 0 || x % 5 === 0; });
+      return t.length >= 2 ? t.slice(0, 2) : [entiers[0], entiers[entiers.length - 1]];
+    }
+    var zero = entiers.indexOf(0);
+    if (zero >= 0 && zero + 1 < entiers.length) return [0, 1];
+    if (zero > 0) return [-1, 0];
+    return entiers.slice(0, 2);
+  }
+
   function questionLireDroite(alea, p) {
     var pas = [0, 1, 0.5, 0.25, 0.1, 0.2][p];
     var min = p <= 1 ? alea.entier(-8, -2) : alea.entier(-5, -1);
     var nTicks = p === 1 ? 12 : p === 4 ? 20 : 12;
     var max = min + nTicks * pas;
-    var etiquettes = pas === 1 ? [0, 5] : [0, 1];
-    etiquettes = etiquettes.filter(function (e) { return e >= min && e <= max; });
+    var etiquettes = etiquettesDroite(min, max, pas);
     var k;
     do { k = alea.entier(1, nTicks - 1); } while (etiquettes.some(function (e) { return Math.abs(min + k * pas - e) < 1e-9; }));
     var v = M.Fraction.depuis(Number((min + k * pas).toFixed(4)));
@@ -78,7 +91,7 @@
       indice: 'Repère 0, puis compte les graduations : une graduation vaut ' + M.formaterNombre(M.Fraction.depuis(pas)) + '.',
       etapes: O.etapes([['Une graduation vaut ' + H.n(M.Fraction.depuis(pas)) + '.', ''], [H.n(cv) + ' est ' + (cv.signe() < 0 ? 'à gauche' : 'à droite') + ' de 0, à ' + Math.round(Math.abs(cible.v) / pas) + ' graduation(s) : c\'est le point ' + cible.nom + '.', '']]),
       rubrique: R.relatifs,
-      visuel: { type: 'droite', min: min, max: max, pas: pas, points: points, etiquettes: [0, 1].filter(function (e) { return e >= min && e <= max; }) },
+      visuel: { type: 'droite', min: min, max: max, pas: pas, points: points, etiquettes: etiquettesDroite(min, max, pas) },
       nombres: [cv],
       controle: { type: 'aucun' }
     }, alea);

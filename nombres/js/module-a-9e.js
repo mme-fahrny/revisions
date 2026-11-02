@@ -298,7 +298,7 @@
       etapes: et,
       verification: deuxEtapes ? 'Vérification : ' + m(H.f(f1) + ' + ' + H.f(f2) + ' + ' + H.f(reste) + ' = 1') + '. ✓' : verifApprochee(H.arrondi(f1, 2) + ' + ' + H.arrondi(f2, 2), res),
       rubrique: R.addFractions,
-      visuel: { type: 'disque', parts: O.ppmc(b, d), colorees: 0, interactif: true, aide: true },
+      visuel: O.ppmc(b, d) <= 24 ? { type: 'disque', parts: O.ppmc(b, d), colorees: 0, interactif: true, aide: true } : null,
       nombres: [f1, f2],
       controle: { expr: expr.t }
     });
@@ -958,10 +958,9 @@
   function etapesComparer(c) {
     var et = [];
     var x = c.x, y = c.y;
-    if (x.estDecimale() && y.estDecimale() && (c.genre === 'decFrac')) {
-      et.push(['J\'écris les deux nombres en écriture décimale.', m(c.hx + ' = ' + H.n(x) + ' ; ' + c.hy + ' = ' + H.n(y))]);
-    } else if (c.genre === 'decFrac') {
-      et.push(['J\'écris les deux nombres en écriture décimale.', m(c.hx + ' = ' + H.n(x) + ' ; ' + c.hy + ' = ' + H.n(y))]);
+    if (c.genre === 'decFrac') {
+      var ex = function (h, v) { return h === H.n(v) ? h : h + ' = ' + H.n(v); };
+      et.push(['J\'écris les deux nombres en écriture décimale.', m(ex(c.hx, x) + ' ; ' + ex(c.hy, y))]);
     } else if (c.genre === 'memeNum') {
       et.push(['Les numérateurs sont égaux : la fraction qui a le plus petit dénominateur a les plus grandes parts, elle est la plus grande.', '']);
     } else {

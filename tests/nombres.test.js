@@ -281,6 +281,28 @@ function verifierBornes(q, o, ident) {
   });
 }
 
+/** Droite numérique lisible : au moins deux nombres écrits, points dans la droite. */
+function verifierVisuels(q, ident) {
+  [q.visuel, q.visuelCorrection].forEach(function (v) {
+    if (!v) return;
+    if (v.type === 'droite') {
+      verifierQue(v.max > v.min && v.pas > 0, 'droite : bornes', ident);
+      (v.points || []).forEach(function (p) { verifierQue(p.v >= v.min - 1e-9 && p.v <= v.max + 1e-9, 'droite : point hors de la droite', ident + ' ' + p.v + ' [' + v.min + ' ; ' + v.max + ']'); });
+      if (v.etiquettes) {
+        var dedans = v.etiquettes.filter(function (e) { return e >= v.min - 1e-9 && e <= v.max + 1e-9; });
+        verifierQue(dedans.length >= 2, 'droite : moins de deux nombres écrits (graduations illisibles)', ident + ' ' + JSON.stringify(v));
+        // le point à trouver n'est pas déjà écrit sous la droite
+        if (q.reponse.type === 'valeur' && v === q.visuel) verifierQue(!dedans.some(function (e) { return Math.abs(e - q.reponse.valeur.valeur()) < 1e-9; }), 'droite : la réponse est écrite sous la droite', ident);
+      } else {
+        var entiers = 0;
+        for (var x = Math.ceil(v.min); x <= v.max; x++) entiers++;
+        verifierQue(entiers >= 1, 'droite : aucun entier visible', ident + ' ' + JSON.stringify(v));
+      }
+    }
+    if (v.type === 'barre' || v.type === 'disque') verifierQue(v.parts >= 2 && v.parts <= 24 && (v.colorees || 0) <= v.parts, 'figure partagée incohérente', ident);
+  });
+}
+
 function verifierEcriture(q, ident) {
   var morceaux = [q.enonce, q.consigne, q.indice, q.verification].concat(q.etapes.map(function (e) { return e.texte + ' ' + e.calcul; }));
   if (q.choix) morceaux = morceaux.concat(q.choix.map(function (c) { return c.h + ' ' + (c.message || ''); }));
@@ -340,6 +362,7 @@ modules.forEach(function (mod) {
             verifierReponses(q, ident);
             verifierBornes(q, o, ident);
             verifierEcriture(q, ident);
+            verifierVisuels(q, ident);
           });
         }
       });

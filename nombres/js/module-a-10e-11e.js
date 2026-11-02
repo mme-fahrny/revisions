@@ -552,7 +552,12 @@
       ]),
       verification: 'Vérification : ' + M.formaterNombre(a, 4) + ' &lt; ' + M.formaterNombre(mi, 4) + ' &lt; ' + M.formaterNombre(b, 4) + ' (valeurs approchées). ✓',
       rubrique: R.comparer,
-      visuel: { type: 'droite', min: Math.floor(a.valeur() * 10) / 10, max: Math.ceil(b.valeur() * 10 + 1e-9) / 10 + (p > 3 ? 0 : 0), pas: p > 3 ? 0.001 : 0.01, interactif: true, zoom: true },
+      visuel: (function () {
+        var lo = Math.floor(a.valeur() * 10 + 1e-9) / 10, hi = Math.ceil(b.valeur() * 10 - 1e-9) / 10;
+        if (hi <= lo) hi = lo + 0.1;
+        lo = Number(lo.toFixed(1)); hi = Number(hi.toFixed(1));
+        return { type: 'droite', min: lo, max: hi, pas: p > 3 ? 0.001 : 0.01, interactif: true, etiquettes: [lo, hi] };
+      })(),
       nombres: [a, b],
       controle: { type: 'entre', a: a.toString(), b: b.toString() }
     });
@@ -582,7 +587,7 @@
       ]),
       verification: x.signe() < 0 ? 'Attention : avec un nombre négatif, le plus petit des deux nombres est le plus éloigné de zéro.' : '',
       rubrique: R.comparer,
-      visuelCorrection: { type: 'droite', min: bas.valeur() - pas.valeur(), max: haut.valeur() + pas.valeur(), pas: pas.valeur() / 10 * 10 / (auDixieme ? 10 : 2), points: [{ v: x.valeur(), nom: 'x', label: M.formaterFraction(x) }] },
+      visuelCorrection: { type: 'droite', min: Number((bas.valeur() - pas.valeur()).toFixed(1)), max: Number((haut.valeur() + pas.valeur()).toFixed(1)), pas: auDixieme ? 0.01 : 0.1, points: [{ v: x.valeur(), nom: 'x', label: M.formaterFraction(x) }], etiquettes: [bas.valeur(), haut.valeur()] },
       nombres: [x],
       controle: { type: 'encadrement', expr: x.toString(), pas: pas.valeur() }
     });
