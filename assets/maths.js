@@ -4,20 +4,42 @@
  * Fonctionne dans le navigateur (objet global « Maths ») et dans Node
  * (const Maths = require('./assets/maths.js')).
  *
- * Contenu :
+ * Conventions d'écriture : celles de l'Aide-mémoire Mathématiques 9-10-11
+ * (CIIP, 2024). Voir la section « Conventions d'écriture » du README.
+ *
+ * CALCUL ET CORRECTION
  *   Maths.Alea                     générateur aléatoire avec graine
  *   Maths.Fraction                 fractions exactes (BigInt)
- *   Maths.analyser(texte)          expression -> arbre (AST)
+ *   Maths.analyser(texte)          expression -> arbre ; lève Maths.ErreurSaisie
  *   Maths.evaluer(expr, valeurs)   valeur exacte (Fraction)
+ *   Maths.evaluerApproche(expr, valeurs)   valeur approchée (Number), utile avec √
  *   Maths.lettres(expr)            lettres présentes, triées
- *   Maths.versTexte(expr)          écriture lisible (×, −, virgule)
- *   Maths.equivalentes(a, b)       même expression ? (évaluation en points aléatoires)
- *   Maths.estReduite(expr)         pas de termes semblables, pas de parenthèses…
- *   Maths.estReduiteOrdonnee(expr, lettre?)  réduite + degrés décroissants
+ *   Maths.equivalentes(a, b)       même valeur en plusieurs points tirés au hasard ?
+ *   Maths.estReduite(expr), Maths.estReduiteOrdonnee(expr, lettre?)
  *   Maths.estFractionIrreductible(texte)
- *   Maths.lireNotationScientifique(texte) / Maths.estNotationScientifique(texte)
- *   Maths.formaterNombre(x, decimales)       « 1'234,5 »
- *   Maths.ErreurSaisie                        erreur levée si la saisie est illisible
+ *   Maths.lireNotationScientifique(texte), Maths.estNotationScientifique(texte)
+ *   Maths.lireMontant(texte)       « 7.20 », « 7,20 », « CHF 7.20 », « 7.– » -> Fraction
+ *   Maths.lireListe(texte), Maths.lireEnsemble(texte), Maths.ensemblesEgaux(a, b)
+ *
+ * AFFICHAGE (à utiliser partout, pour une écriture uniforme)
+ *   Maths.versTexte(expr)                  3x² – 2(x + 1) ; 12 : 4 ; √(x + 1)
+ *   Maths.formaterNombre(x, decimales?)    31'500 ; – 2,5 ; 1,18 (barre sur 18)
+ *   Maths.formaterFraction(x)              – 3/4
+ *   Maths.formaterRelatif(x, options?)     (+ 5) ; (– 3) ; ou 5 ; – 3
+ *   Maths.formaterPuissance(base, n)       x² ; (– 3)⁴ ; 10⁻³
+ *   Maths.formaterNotationScientifique(x, decimales?)   3,2 · 10⁴
+ *   Maths.formaterRacine(radicande, indice?, coefficient?)   √2 ; ∛8 ; 3√(x + 1)
+ *   Maths.formaterMontant(x, options?)     7.20 francs ; CHF 7.20
+ *   Maths.formaterListe(elements)          1 ; 2 ; 3
+ *   Maths.formaterEnsemble(elements)       { 1 ; 2 ; 3 } ; { }
+ *   Maths.formaterCoordonnees(x, y, …)     (2 ; – 3)
+ *   Maths.formaterSolutions(solutions)     S = { – 3 ; 3 } ; S = { } ; S = ℝ
+ *   Maths.ENSEMBLES                        { N: 'ℕ', Z: 'ℤ', D: '𝔻', Q: 'ℚ', R: 'ℝ' }
+ *   Maths.html.nombre(x), Maths.html.fraction(x)   versions HTML (barre de période, fraction empilée)
+ *
+ * Typographie produite : signe moins « – » (tiret demi-cadratin) suivi d'une
+ * espace insécable (U+00A0), apostrophe droite « ' » pour les milliers,
+ * espaces insécables avant « ; » et à l'intérieur des accolades.
  *
  * Toutes les fonctions qui acceptent « expr » prennent soit un texte, soit un
  * arbre déjà produit par Maths.analyser.
@@ -89,8 +111,43 @@
   };
 
   /* =====================================================================
-   * 2. Fractions exactes
+   * 2. Erreurs
    * ===================================================================== */
+
+  /** Erreur de saisie : message en français destiné à l'élève, position du problème. */
+  function ErreurSaisie(message, position) {
+    this.name = 'ErreurSaisie';
+    this.message = message;
+    this.position = position === undefined ? -1 : position;
+    this.stack = new Error(message).stack;
+  }
+  ErreurSaisie.prototype = Object.create(Error.prototype);
+  ErreurSaisie.prototype.constructor = ErreurSaisie;
+
+  /** Erreur de calcul (division par zéro, racine carrée d'un nombre négatif…). */
+  function ErreurCalcul(message) {
+    this.name = 'ErreurCalcul';
+    this.message = message;
+    this.stack = new Error(message).stack;
+  }
+  ErreurCalcul.prototype = Object.create(Error.prototype);
+  ErreurCalcul.prototype.constructor = ErreurCalcul;
+
+  /** Résultat non rationnel (√2…) : impossible en calcul exact. Sous-type d'ErreurCalcul. */
+  function ErreurIrrationnel(message) {
+    ErreurCalcul.call(this, message);
+    this.name = 'ErreurIrrationnel';
+  }
+  ErreurIrrationnel.prototype = Object.create(ErreurCalcul.prototype);
+  ErreurIrrationnel.prototype.constructor = ErreurIrrationnel;
+
+  /* =====================================================================
+   * 3. Fractions exactes
+   * ===================================================================== */
+
+  var NBSP = ' ';
+  var MOINS = '–' + NBSP;          // « – » + espace insécable
+  var OVERLINE = '̅';              // trait suscrit combinant (barre de période)
 
   function absBig(a) { return a < 0n ? -a : a; }
   function pgcd(a, b) {
@@ -107,15 +164,23 @@
     throw new TypeError('Entier attendu : ' + n);
   }
 
-  /** Normalise une écriture de nombre « suisse » : − → -, apostrophes, virgule. */
-  function normaliserNombre(texte) {
-    return String(texte).trim()
-      .replace(/[−–]/g, '-')
-      .replace(/['’\s]/g, '')
-      .replace(',', '.');
+  /** Racine k-ième entière (partie entière) d'un BigInt positif, méthode de Newton. */
+  function racineEntiere(n, k) {
+    if (n < 2n) return n;
+    var K = BigInt(k);
+    var x = 1n << BigInt(Math.ceil(n.toString(2).length / k) + 1);
+    for (;;) {
+      var y = ((K - 1n) * x + n / (x ** (K - 1n))) / K;
+      if (y >= x) return x;
+      x = y;
+    }
   }
 
-  /** Lit un nombre décimal écrit en texte (« -2,5 », « 1'250.75 », « 3e-4 »). */
+  function groupesMilliers(chiffres) {
+    return chiffres.length > 3 ? chiffres.replace(/\B(?=(\d{3})+$)/g, "'") : chiffres;
+  }
+
+  /** Lit un nombre décimal brut (« -2.5 », « 3e-4 ») ; usage interne. */
   function lireDecimal(texte) {
     var m = /^([+-]?)(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/i.exec(texte);
     if (!m || (m[2] === '' && (m[3] === undefined || m[3] === ''))) {
@@ -131,10 +196,69 @@
     return new Fraction(num, den);
   }
 
+  /*
+   * Lecture d'un nombre tel que l'élève l'écrit :
+   *   milliers séparés par apostrophe, espace (ou rien) : 31'500 ; 31 500 ; 31500
+   *   virgule (ou point) décimale : 2,5
+   *   période barrée (touche « période » du clavier) : 1,18̅ ou 1,1̅8̅
+   *   période répétée suivie de « … » ou « ... » : 1,1818… ; 0,1666…
+   */
+  var RE_NOMBRE = /^(\d{1,3}(?:['’   ]\d{3})+(?!\d)|\d+)(?:[.,]((?:\d̅?)+))?(…|\.\.\.)?/;
+
+  /** Cherche la période dans des chiffres écrits « au moins deux fois » (1818 -> 18). */
+  function trouverPeriode(ch) {
+    for (var debut = 0; debut < ch.length; debut++) {
+      var reste = ch.slice(debut);
+      for (var p = 1; 2 * p <= reste.length; p++) {
+        var ok = true;
+        for (var i = p; i < reste.length; i++) {
+          if (reste[i] !== reste[i - p]) { ok = false; break; }
+        }
+        if (ok) return { avant: ch.slice(0, debut), periode: reste.slice(0, p) };
+      }
+    }
+    return null;
+  }
+
+  /** Valeur exacte de entier,avant(periode) : ex. 1,1(18) -> 13/11. */
+  function valeurDecimale(entier, avant, periode) {
+    var f = new Fraction(BigInt((entier || '0') + avant), puissance10(avant.length));
+    if (periode) {
+      f = f.plus(new Fraction(BigInt(periode), puissance10(avant.length) * (puissance10(periode.length) - 1n)));
+    }
+    return f;
+  }
+
+  function interpreterNombre(m, pos) {
+    var entier = m[1].replace(/\D/g, '');
+    var dec = m[2] || '';
+    var chiffres = dec.replace(/̅/g, '');
+    var avant = chiffres, periode = '';
+    if (dec.indexOf(OVERLINE) >= 0) {
+      var marques = [];
+      for (var i = 0; i < dec.length; i++) {
+        if (dec[i] === OVERLINE) continue;
+        marques.push(dec[i + 1] === OVERLINE);
+      }
+      var k = marques.indexOf(true);
+      for (var j = k; j < marques.length; j++) {
+        if (!marques[j]) throw new ErreurSaisie('La barre de période doit couvrir les derniers chiffres.', pos);
+      }
+      avant = chiffres.slice(0, k);
+      periode = chiffres.slice(k);
+    } else if (m[3]) {
+      var r = chiffres ? trouverPeriode(chiffres) : null;
+      if (!r) throw new ErreurSaisie('Écris la période au moins deux fois avant « … », par exemple 1,1818…', pos);
+      avant = r.avant;
+      periode = r.periode;
+    }
+    return valeurDecimale(entier, avant, periode);
+  }
+
   /**
    * new Maths.Fraction(num, den?) — num et den entiers (Number ou BigInt).
-   * La fraction est toujours stockée simplifiée, dénominateur positif.
-   * Pour lire « 3/4 », « 2,5 » ou 0.125 : Maths.Fraction.depuis(valeur).
+   * Toujours stockée simplifiée, dénominateur positif.
+   * Pour lire « 3/4 », « 2,5 », « 31'500 », « 0,1666… » ou 0.125 : Maths.Fraction.depuis(valeur).
    */
   function Fraction(num, den) {
     if (!(this instanceof Fraction)) return new Fraction(num, den);
@@ -154,7 +278,7 @@
     this.den = d;
   }
 
-  /** Convertit une valeur (Fraction, nombre, BigInt, texte « 3/4 » ou « 2,5 ») en Fraction. */
+  /** Convertit une valeur (Fraction, nombre, BigInt ou texte) en Fraction. */
   Fraction.depuis = function (v) {
     if (v instanceof Fraction) return v;
     if (typeof v === 'bigint') return new Fraction(v, 1n);
@@ -164,10 +288,20 @@
       return lireDecimal(String(v));
     }
     if (typeof v === 'string') {
-      var t = normaliserNombre(v);
+      var t = v.trim().replace(/[−–—]/g, '-');
+      var negatif = false;
+      var s = /^([+-])\s*/.exec(t);
+      if (s) { negatif = s[1] === '-'; t = t.slice(s[0].length); }
+      var res;
       var i = t.indexOf('/');
-      if (i >= 0) return lireDecimal(t.slice(0, i)).divise(lireDecimal(t.slice(i + 1)));
-      return lireDecimal(t);
+      if (i >= 0) {
+        res = Fraction.depuis(t.slice(0, i)).divise(Fraction.depuis(t.slice(i + 1)));
+      } else {
+        var m = RE_NOMBRE.exec(t);
+        if (m && m[0].length === t.length) res = interpreterNombre(m, 0);
+        else res = lireDecimal(t.replace(/['’\s]/g, '').replace(',', '.'));
+      }
+      return negatif ? res.oppose() : res;
     }
     throw new TypeError('Impossible de convertir en fraction : ' + v);
   };
@@ -198,6 +332,20 @@
     }
     return new Fraction(this.num ** BigInt(k), this.den ** BigInt(k));
   };
+  /**
+   * Racine exacte d'indice k (2 par défaut). √(9/4) = 3/2 ; ∛(-8) = -2.
+   * Lève ErreurIrrationnel si le résultat n'est pas rationnel (√2),
+   * ErreurCalcul pour la racine carrée d'un nombre négatif.
+   */
+  Fraction.prototype.racine = function (k) {
+    k = k || 2;
+    if (this.num < 0n && k % 2 === 0) throw new ErreurCalcul('Racine carrée d\'un nombre négatif');
+    var a = absBig(this.num);
+    var rn = racineEntiere(a, k), rd = racineEntiere(this.den, k);
+    var K = BigInt(k);
+    if (rn ** K !== a || rd ** K !== this.den) throw new ErreurIrrationnel('Racine non rationnelle');
+    return new Fraction(this.num < 0n ? -rn : rn, rd);
+  };
   Fraction.prototype.oppose = function () { return new Fraction(-this.num, this.den); };
   Fraction.prototype.inverse = function () { return new Fraction(1n, 1n).divise(this); };
   Fraction.prototype.abs = function () { return new Fraction(absBig(this.num), this.den); };
@@ -213,7 +361,7 @@
   Fraction.prototype.signe = function () { return this.num < 0n ? -1 : this.num > 0n ? 1 : 0; };
   /** Valeur approchée (Number JavaScript). */
   Fraction.prototype.valeur = function () { return Number(this.num) / Number(this.den); };
-  /** « 3/4 », « -5/2 », « 7 ». */
+  /** Écriture technique « 3/4 », « -5/2 », « 7 » (pour l'affichage : Maths.formaterFraction). */
   Fraction.prototype.toString = function () {
     return this.den === 1n ? String(this.num) : this.num + '/' + this.den;
   };
@@ -228,15 +376,14 @@
   Fraction.prototype.estPeriodique = function () { return !this.estDecimale(); };
 
   /**
-   * Arrondi décimal exact, au format suisse : versDecimal(2) de 1234.5 -> « 1'234,5 ».
+   * Arrondi décimal exact, au format suisse : versDecimal(2) de -1234.5 -> « – 1'234,5 ».
    * options.fixe = true garde les zéros finaux (« 1'234,50 »).
    * options.milliers = false supprime les apostrophes.
    */
   Fraction.prototype.versDecimal = function (decimales, options) {
     if (decimales === undefined) decimales = 10;
     options = options || {};
-    var echelle = puissance10(decimales);
-    var n = this.num * echelle;
+    var n = this.num * puissance10(decimales);
     var q = n / this.den;
     var r = n % this.den;
     if (2n * absBig(r) >= this.den) q += n < 0n ? -1n : 1n;
@@ -245,18 +392,16 @@
     var entiere = chiffres.slice(0, chiffres.length - decimales);
     var frac = chiffres.slice(chiffres.length - decimales);
     if (!options.fixe) frac = frac.replace(/0+$/, '');
-    if (options.milliers !== false && entiere.length > 3) {
-      entiere = entiere.replace(/\B(?=(\d{3})+$)/g, "'");
-    }
+    if (options.milliers !== false) entiere = groupesMilliers(entiere);
     var texte = entiere + (frac ? ',' + frac : '');
-    if (negatif && /[1-9]/.test(texte)) texte = '-' + texte;
+    if (negatif && /[1-9]/.test(texte)) texte = MOINS + texte;
     return texte;
   };
 
   /**
    * Développement décimal exact (division posée).
-   * Renvoie { signe: '' ou '-', entier: '0', avantPeriode: '1', periode: '6', periodique: true }
-   * pour 1/6 = 0,1666…   Période limitée à 2000 chiffres (sinon tronque: true).
+   * 1/6 -> { signe: '', entier: '0', avantPeriode: '1', periode: '6', periodique: true }
+   * Période limitée à 2000 chiffres (sinon tronque: true).
    */
   Fraction.prototype.developpementDecimal = function () {
     var n = absBig(this.num), d = this.den;
@@ -284,72 +429,52 @@
   };
 
   /**
-   * Écriture décimale exacte en texte : « 0,25 », « 0,16̅ » (barre) ou « 0,1(6) ».
-   * options.periode : 'barre' (défaut, trait combinant U+0305) ou 'parentheses'.
-   * Pour un affichage HTML soigné, utiliser developpementDecimal() et du CSS
-   * (text-decoration: overline) sur la période.
+   * Écriture décimale exacte en texte : « 0,25 », « 1,18 » avec barre sur 18
+   * (trait suscrit combinant U+0305 après chaque chiffre de la période),
+   * ou « 1,(18) » avec options.periode = 'parentheses'.
+   * En HTML, préférer Maths.html.nombre (barre en CSS, plus nette).
    */
   Fraction.prototype.ecritureDecimale = function (options) {
     options = options || {};
     var dev = this.developpementDecimal();
-    var entier = dev.entier.length > 3 ? dev.entier.replace(/\B(?=(\d{3})+$)/g, "'") : dev.entier;
-    var texte = dev.signe + entier;
+    var texte = (dev.signe ? MOINS : '') + groupesMilliers(dev.entier);
     if (dev.avantPeriode || dev.periode) texte += ',' + dev.avantPeriode;
     if (dev.periode) {
       if (options.periode === 'parentheses') texte += '(' + dev.periode + ')';
-      else texte += dev.periode.split('').join('̅') + '̅';
+      else texte += dev.periode.split('').join(OVERLINE) + OVERLINE;
     }
     return texte;
   };
 
-  /** Formate un nombre (Number, Fraction, texte) à la manière suisse : « 1'234,5 ». */
-  function formaterNombre(x, decimales, options) {
-    return Fraction.depuis(x).versDecimal(decimales === undefined ? 10 : decimales, options);
-  }
-
-  /* =====================================================================
-   * 3. Erreurs
-   * ===================================================================== */
-
-  /** Erreur de saisie : message en français destiné à l'élève, position du problème. */
-  function ErreurSaisie(message, position) {
-    this.name = 'ErreurSaisie';
-    this.message = message;
-    this.position = position === undefined ? -1 : position;
-    this.stack = new Error(message).stack;
-  }
-  ErreurSaisie.prototype = Object.create(Error.prototype);
-  ErreurSaisie.prototype.constructor = ErreurSaisie;
-
-  /** Erreur de calcul (division par zéro…). */
-  function ErreurCalcul(message) {
-    this.name = 'ErreurCalcul';
-    this.message = message;
-    this.stack = new Error(message).stack;
-  }
-  ErreurCalcul.prototype = Object.create(Error.prototype);
-  ErreurCalcul.prototype.constructor = ErreurCalcul;
-
   /* =====================================================================
    * 4. Analyseur d'expressions littérales
    *
-   * Accepte : nombres (virgule ou point décimal, apostrophe des milliers),
-   * lettres (une lettre = une variable ; « ab » = a·b), + - − × * · ÷ : /,
-   * parenthèses ( ) [ ], puissances entières ^n, ², ³, ⁻¹,
-   * multiplication implicite : 3a, 2(x+1), (x+1)(x-1), ab.
-   * Priorités usuelles, de gauche à droite : 1/2x = (1/2)·x.
+   * Accepte :
+   *   nombres : virgule (ou point) décimale ; milliers avec apostrophe,
+   *             espace ou rien (31'500, 31 500) ; périodes (1,1̅8̅ ou 1,1818…)
+   *   lettres : une lettre = une variable ; « ab » = a·b
+   *   opérations : + ; - – − ; · * × ; : ÷ ; / (barre de fraction) ; ^n ² ³ ⁻¹
+   *   racines : √ (carrée) et ∛ (cubique). Le radical porte sur ce qui suit
+   *             immédiatement : √2x = √2 · x ; √(x + 1) ; √x² = √(x²)
+   *   parenthèses ( ) et [ ]
+   *   multiplication implicite : 3x, 2(x + 1), a(b + 5), (x + 1)(x – 1), 3√2
+   * Priorités usuelles, de gauche à droite : 1/2x = (1/2)·x ; 12 : 3 · 2 = 8.
+   * Le signe moins porte sur tout le terme : – 2² = – 4.
    *
    * Nœuds de l'arbre :
-   *   { type: 'nombre', valeur: Fraction, texte: '2,5' }
+   *   { type: 'nombre', valeur: Fraction, texte }
    *   { type: 'lettre', nom: 'x' }
-   *   { type: '+' | '-' | '*' | '/', g: nœud, d: nœud, implicite?: true }
-   *   { type: 'neg', arg: nœud }
-   *   { type: '^', base: nœud, exposant: entier (Number) }
+   *   { type: '+' | '-' | '*', g, d, implicite?: true }
+   *   { type: '/', g, d, symbole: '/' (barre de fraction) ou ':' }
+   *   { type: 'neg', arg }
+   *   { type: '^', base, exposant: entier (Number) }
+   *   { type: 'racine', indice: 2 | 3, arg }
    * Un nœud écrit entre parenthèses porte parentheses: true.
    * ===================================================================== */
 
   var EXPOSANTS = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5',
     '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-', '⁺': '+' };
+  var CHIFFRES_EXPOSANTS = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
   function normaliserExpression(texte) {
     return String(texte)
@@ -357,8 +482,8 @@
         return '^(' + s.split('').map(function (c) { return EXPOSANTS[c]; }).join('') + ')';
       })
       .replace(/[−–—]/g, '-')
-      .replace(/[×·⋅*]/g, '*')
-      .replace(/[÷:]/g, '/')
+      .replace(/[×·⋅∙*]/g, '*')
+      .replace(/÷/g, ':')
       .replace(/\[/g, '(').replace(/\]/g, ')');
   }
 
@@ -370,17 +495,21 @@
       var c = s[i];
       if (/\s/.test(c)) { i++; continue; }
       if (/\d/.test(c)) {
-        var m = /^\d+(?:['’]\d{3})*(?:[.,]\d+)?/.exec(s.slice(i));
-        jetons.push({ type: 'nombre', texte: m[0], valeur: Fraction.depuis(m[0]), pos: i });
+        var m = RE_NOMBRE.exec(s.slice(i));
+        jetons.push({ type: 'nombre', texte: m[0], valeur: interpreterNombre(m, i), pos: i });
         i += m[0].length;
         continue;
       }
-      if (/[.,]/.test(c)) {
+      if (c === '.' || c === ',') {
         throw new ErreurSaisie('Écris un chiffre avant la virgule (par exemple 0,5).', i);
       }
+      if (c === OVERLINE) throw new ErreurSaisie('La barre de période se place sur des chiffres après la virgule.', i);
       if (/[a-zA-Z]/.test(c)) { jetons.push({ type: 'lettre', nom: c, pos: i }); i++; continue; }
-      if ('+-*/^'.indexOf(c) >= 0) { jetons.push({ type: 'op', op: c, pos: i }); i++; continue; }
+      if (c === '+' || c === '-' || c === '*' || c === '^') { jetons.push({ type: 'op', op: c, pos: i }); i++; continue; }
+      if (c === '/' || c === ':') { jetons.push({ type: 'op', op: '/', symbole: c, pos: i }); i++; continue; }
+      if (c === '√' || c === '∛') { jetons.push({ type: 'racine', indice: c === '√' ? 2 : 3, pos: i }); i++; continue; }
       if (c === '(' || c === ')') { jetons.push({ type: c, pos: i }); i++; continue; }
+      if (c === ';') throw new ErreurSaisie('Le point-virgule sépare des éléments d\'une liste : une seule expression est attendue ici.', i);
       throw new ErreurSaisie('Caractère non reconnu : « ' + c + ' »', i);
     }
     return jetons;
@@ -411,10 +540,13 @@
     var g = this.unaire();
     for (;;) {
       var j = this.voir();
-      if (this.estOp('*') || this.estOp('/')) {
+      if (this.estOp('*')) {
         this.i++;
-        g = { type: j.op, g: g, d: this.unaire() };
-      } else if (j && (j.type === 'lettre' || j.type === '(')) {
+        g = { type: '*', g: g, d: this.unaire() };
+      } else if (this.estOp('/')) {
+        this.i++;
+        g = { type: '/', g: g, d: this.unaire(), symbole: j.symbole };
+      } else if (j && (j.type === 'lettre' || j.type === '(' || j.type === 'racine')) {
         g = { type: '*', g: g, d: this.puissance(), implicite: true };
       } else if (j && j.type === 'nombre') {
         throw new ErreurSaisie('Il manque un signe d\'opération avant « ' + j.texte + ' ».', j.pos);
@@ -424,7 +556,7 @@
     }
   };
   Analyseur.prototype.unaire = function () {
-    // Le signe moins porte sur tout le terme qui suit : -2x = -(2x), -2^2 = -4.
+    // Le signe porte sur tout le terme qui suit : -2x = -(2x), -2^2 = -4.
     if (this.estOp('-')) { this.i++; return { type: 'neg', arg: this.terme() }; }
     if (this.estOp('+')) { this.i++; return this.terme(); }
     return this.puissance();
@@ -434,8 +566,7 @@
     if (this.estOp('^')) {
       var pos = this.position();
       this.i++;
-      var n = this.exposant(pos);
-      base = { type: '^', base: base, exposant: n };
+      base = { type: '^', base: base, exposant: this.exposant(pos) };
       if (this.estOp('^')) {
         throw new ErreurSaisie('Mets des parenthèses pour enchaîner deux puissances.', this.position());
       }
@@ -456,7 +587,9 @@
     } else if (j && j.type === '(') {
       var noeud = this.primaire();
       if (lettresDe(noeud).length) throw new ErreurSaisie('L\'exposant doit être un nombre entier.', pos);
-      valeur = evaluerNoeud(noeud, {});
+      try { valeur = evaluerNoeud(noeud, {}); } catch (e) {
+        throw new ErreurSaisie('L\'exposant doit être un nombre entier.', pos);
+      }
     } else {
       throw new ErreurSaisie('Il manque l\'exposant après « ^ ».', pos);
     }
@@ -470,6 +603,14 @@
     if (!j) throw new ErreurSaisie('L\'expression est incomplète.', -1);
     if (j.type === 'nombre') { this.i++; return { type: 'nombre', valeur: j.valeur, texte: j.texte }; }
     if (j.type === 'lettre') { this.i++; return { type: 'lettre', nom: j.nom }; }
+    if (j.type === 'racine') {
+      this.i++;
+      var suivant = this.voir();
+      if (!suivant || suivant.type === 'op' || suivant.type === ')') {
+        throw new ErreurSaisie('Écris ce qui est sous la racine, par exemple √(x + 1).', j.pos);
+      }
+      return { type: 'racine', indice: j.indice, arg: this.puissance() };
+    }
     if (j.type === '(') {
       this.i++;
       if (this.voir() && this.voir().type === ')') throw new ErreurSaisie('Parenthèses vides.', j.pos);
@@ -482,7 +623,7 @@
       return e;
     }
     if (j.type === ')') throw new ErreurSaisie('Parenthèse fermante en trop.', j.pos);
-    throw new ErreurSaisie('Signe « ' + j.op + ' » mal placé.', j.pos);
+    throw new ErreurSaisie('Signe « ' + (j.symbole || j.op) + ' » mal placé.', j.pos);
   };
 
   function copier(n) {
@@ -507,7 +648,7 @@
   function lettresDe(n, ens) {
     ens = ens || {};
     if (n.type === 'lettre') ens[n.nom] = true;
-    else if (n.type === 'neg') lettresDe(n.arg, ens);
+    else if (n.type === 'neg' || n.type === 'racine') lettresDe(n.arg, ens);
     else if (n.type === '^') lettresDe(n.base, ens);
     else if (n.g) { lettresDe(n.g, ens); lettresDe(n.d, ens); }
     return Object.keys(ens).sort();
@@ -515,6 +656,10 @@
 
   /** Lettres présentes dans l'expression, par ordre alphabétique. */
   function lettres(expr) { return lettresDe(analyser(expr)); }
+
+  /* =====================================================================
+   * 5. Évaluation
+   * ===================================================================== */
 
   function evaluerNoeud(n, valeurs) {
     switch (n.type) {
@@ -524,6 +669,7 @@
         return Fraction.depuis(valeurs[n.nom]);
       case 'neg': return evaluerNoeud(n.arg, valeurs).oppose();
       case '^': return evaluerNoeud(n.base, valeurs).puissance(n.exposant);
+      case 'racine': return evaluerNoeud(n.arg, valeurs).racine(n.indice);
       case '+': return evaluerNoeud(n.g, valeurs).plus(evaluerNoeud(n.d, valeurs));
       case '-': return evaluerNoeud(n.g, valeurs).moins(evaluerNoeud(n.d, valeurs));
       case '*': return evaluerNoeud(n.g, valeurs).fois(evaluerNoeud(n.d, valeurs));
@@ -532,62 +678,64 @@
     throw new Error('Nœud inconnu : ' + n.type);
   }
 
-  /** Valeur exacte (Fraction). evaluer('3x+1', { x: 2 }) -> 7. Lève ErreurCalcul si division par 0. */
-  function evaluer(expr, valeurs) { return evaluerNoeud(analyser(expr), valeurs || {}); }
-
-  /* ---------- Écriture lisible ---------- */
-
-  var PRIORITE = { '+': 1, '-': 1, '*': 2, '/': 2, neg: 1.5, '^': 4, nombre: 5, lettre: 5 };
-
-  function texteNombre(n) {
-    var t = n.texte !== undefined ? n.texte.replace('.', ',') : n.valeur.versDecimal(10);
-    return t;
-  }
-
-  function versTexteNoeud(n) {
-    var p = PRIORITE[n.type];
-    function enfant(e, min) {
-      var t = versTexteNoeud(e);
-      return PRIORITE[e.type] < min ? '(' + t + ')' : t;
-    }
+  function approcheNoeud(n, valeurs) {
+    var r;
     switch (n.type) {
-      case 'nombre':
-        if (n.valeur.estEntier() || n.texte !== undefined) return texteNombre(n);
-        return '(' + n.valeur.num + '/' + n.valeur.den + ')';
-      case 'lettre': return n.nom;
-      case 'neg': return '−' + enfant(n.arg, 2);
-      case '^': {
-        var base = n.base.type === 'nombre' && n.base.valeur.signe() < 0
-          ? '(' + versTexteNoeud(n.base) + ')' : enfant(n.base, 5);
-        return base + '^' + (n.exposant < 0 ? '(' + '−' + (-n.exposant) + ')' : n.exposant);
+      case 'nombre': return n.valeur.valeur();
+      case 'lettre':
+        if (!(n.nom in valeurs)) throw new ErreurCalcul('Valeur manquante pour ' + n.nom);
+        return Fraction.depuis(valeurs[n.nom]).valeur();
+      case 'neg': return -approcheNoeud(n.arg, valeurs);
+      case '^': r = Math.pow(approcheNoeud(n.base, valeurs), n.exposant); break;
+      case 'racine': {
+        var a = approcheNoeud(n.arg, valeurs);
+        if (n.indice === 2 && a < 0) throw new ErreurCalcul('Racine carrée d\'un nombre négatif');
+        r = n.indice === 2 ? Math.sqrt(a) : Math.cbrt(a);
+        break;
       }
-      case '+': return enfant(n.g, 1) + ' + ' + enfant(n.d, 2);
-      case '-': return enfant(n.g, 1) + ' − ' + enfant(n.d, 2);
-      case '/':
-        if (n.g.type === 'nombre' && n.d.type === 'nombre') return texteNombre(n.g) + '/' + texteNombre(n.d);
-        return enfant(n.g, 2) + ' / ' + enfant(n.d, 3);
-      case '*': {
-        // (1/2)x plutôt que 1/2x, qui se lirait 1/(2x)
-        var g = n.g.type === '/' && !n.g.parentheses ? '(' + versTexteNoeud(n.g) + ')' : enfant(n.g, 2);
-        var d = enfant(n.d, 3);
-        var implicite = (n.d.type === 'lettre' || /^\(/.test(d) ||
-          (n.d.type === '^' && n.d.base.type === 'lettre')) && !/^[−-]/.test(d);
-        return implicite ? g + d : g + ' × ' + d;
+      case '+': r = approcheNoeud(n.g, valeurs) + approcheNoeud(n.d, valeurs); break;
+      case '-': r = approcheNoeud(n.g, valeurs) - approcheNoeud(n.d, valeurs); break;
+      case '*': r = approcheNoeud(n.g, valeurs) * approcheNoeud(n.d, valeurs); break;
+      case '/': {
+        var d = approcheNoeud(n.d, valeurs);
+        if (d === 0) throw new ErreurCalcul('Division par zéro');
+        r = approcheNoeud(n.g, valeurs) / d;
+        break;
       }
+      default: throw new Error('Nœud inconnu : ' + n.type);
     }
-    return '?';
+    if (!isFinite(r)) throw new ErreurCalcul('Valeur non calculable');
+    return r;
   }
-
-  /** Écriture lisible : « 3x^2 − 2(x + 1) ». */
-  function versTexte(expr) { return versTexteNoeud(analyser(expr)); }
-
-  /* =====================================================================
-   * 5. Équivalence de deux expressions
-   * ===================================================================== */
 
   /**
-   * Vrai si les deux expressions prennent la même valeur exacte en
-   * plusieurs points rationnels choisis au hasard (avec graine fixe).
+   * Valeur exacte (Fraction). evaluer('3x + 1', { x: 2 }) -> 7.
+   * Lève ErreurCalcul (division par 0…) ou ErreurIrrationnel (√2…).
+   */
+  function evaluer(expr, valeurs) { return evaluerNoeud(analyser(expr), valeurs || {}); }
+
+  /** Valeur approchée (Number), fonctionne aussi avec les racines non exactes. */
+  function evaluerApproche(expr, valeurs) { return approcheNoeud(analyser(expr), valeurs || {}); }
+
+  /* =====================================================================
+   * 6. Équivalence de deux expressions
+   * ===================================================================== */
+
+  function memesValeurs(A, B, valeurs) {
+    try {
+      return evaluerNoeud(A, valeurs).egal(evaluerNoeud(B, valeurs));
+    } catch (e) {
+      if (!(e instanceof ErreurIrrationnel)) throw e;
+    }
+    // Racines non exactes : comparaison approchée (écart relatif < 10⁻¹¹)
+    var x = approcheNoeud(A, valeurs), y = approcheNoeud(B, valeurs);
+    return Math.abs(x - y) <= 1e-11 * Math.max(1, Math.abs(x), Math.abs(y));
+  }
+
+  /**
+   * Vrai si les deux expressions prennent la même valeur en plusieurs points
+   * rationnels choisis au hasard (graine fixe : résultat reproductible).
+   * Calcul exact ; approché à 10⁻¹¹ près seulement en présence de racines non exactes.
    * options : { essais: 12, graine: 2024, lettres: [...] }
    * Lève ErreurSaisie si l'une des expressions est illisible :
    * appeler Maths.analyser(reponse) d'abord pour afficher un message à l'élève.
@@ -602,23 +750,18 @@
     for (var tentative = 0; tentative < essais * 6 && reussis < essais; tentative++) {
       var valeurs = {};
       for (var k = 0; k < noms.length; k++) {
-        var v;
-        if (alea.suivant() < 0.6) {
-          v = new Fraction(alea.signe() * alea.entier(2, 12), 1);
-        } else {
-          v = new Fraction(alea.signe() * alea.entier(1, 19), alea.entier(2, 9));
-        }
-        valeurs[noms[k]] = v;
+        valeurs[noms[k]] = alea.suivant() < 0.6
+          ? new Fraction(alea.signe() * alea.entier(2, 12), 1)
+          : new Fraction(alea.signe() * alea.entier(1, 19), alea.entier(2, 9));
       }
-      var va, vb;
+      var egales;
       try {
-        va = evaluerNoeud(A, valeurs);
-        vb = evaluerNoeud(B, valeurs);
+        egales = memesValeurs(A, B, valeurs);
       } catch (e) {
-        if (e instanceof ErreurCalcul) continue; // division par zéro en ce point : on en essaie un autre
+        if (e instanceof ErreurCalcul) continue; // pas calculable en ce point : on en essaie un autre
         throw e;
       }
-      if (!va.egal(vb)) return false;
+      if (!egales) return false;
       reussis++;
       if (noms.length === 0) return true;
     }
@@ -626,7 +769,7 @@
   }
 
   /* =====================================================================
-   * 6. Tests de forme
+   * 7. Tests de forme
    * ===================================================================== */
 
   function aplatirSomme(n, signe, liste) {
@@ -773,8 +916,8 @@
   }
 
   /**
-   * Lit une notation scientifique correcte « a × 10^n » avec 1 ≤ |a| < 10.
-   * Accepte ×, *, ·, x comme signe de multiplication, ^n ou exposants ²,⁻³.
+   * Lit une notation scientifique correcte « a · 10ⁿ » avec 1 ≤ |a| < 10.
+   * Accepte ·, *, ×, x comme signe de multiplication ; ^n, ^(–n) ou exposants ⁻³.
    * Renvoie { mantisse: Fraction, exposant: n, valeur: Fraction } ou null.
    */
   function lireNotationScientifique(texte) {
@@ -782,9 +925,9 @@
       .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺]+/g, function (s) {
         return '^' + s.split('').map(function (c) { return EXPOSANTS[c]; }).join('');
       })
-      .replace(/[−–]/g, '-')
+      .replace(/[−–—]/g, '-')
       .replace(/\s/g, '');
-    var m = /^([+-]?)([1-9](?:[.,]\d+)?)[×*·⋅xX]10\^(?:\(([+-]?\d+)\)|([+-]?\d+))$/.exec(t);
+    var m = /^([+-]?)([1-9](?:[.,]\d+)?)[·⋅∙×*xX]10\^(?:\(([+-]?\d+)\)|([+-]?\d+))$/.exec(t);
     if (!m) return null;
     var mantisse = Fraction.depuis(m[1] + m[2]);
     var exposant = parseInt(m[3] !== undefined ? m[3] : m[4], 10);
@@ -798,23 +941,355 @@
   /** Vrai si le texte est une notation scientifique correcte (voir lireNotationScientifique). */
   function estNotationScientifique(texte) { return lireNotationScientifique(texte) !== null; }
 
+  /* =====================================================================
+   * 8. Affichage (conventions de l'aide-mémoire)
+   * ===================================================================== */
+
+  var ENSEMBLES = { N: 'ℕ', Z: 'ℤ', D: '𝔻', Q: 'ℚ', R: 'ℝ' };
+
+  /** Exposant en chiffres surélevés : -3 -> « ⁻³ ». */
+  function texteExposant(k) {
+    var s = String(Math.abs(k)).split('').map(function (c) { return CHIFFRES_EXPOSANTS[+c]; }).join('');
+    return (k < 0 ? '⁻' : '') + s;
+  }
+
+  /**
+   * Nombre au format suisse : virgule décimale, apostrophe des milliers, « – » typographique.
+   * Sans « decimales » : écriture exacte, période barrée si besoin (1/3 -> 0,3̅).
+   * Avec « decimales » : arrondi (formaterNombre(2/3, 2) -> 0,67).
+   * options : { fixe: true } garde les zéros finaux ; { milliers: false } ;
+   *           { periode: 'parentheses' } -> 1,(18).
+   * Pour un Number issu d'un calcul (0.1 + 0.2), préciser « decimales ».
+   */
+  function formaterNombre(x, decimales, options) {
+    var f = Fraction.depuis(x);
+    if (decimales === undefined || decimales === null) return f.ecritureDecimale(options);
+    return f.versDecimal(decimales, options);
+  }
+
+  /** Fraction : « 3/4 », « – 3/4 », « 5 ». */
+  function formaterFraction(x) {
+    var f = Fraction.depuis(x);
+    var signe = f.signe() < 0 ? MOINS : '';
+    var a = f.abs();
+    if (a.estEntier()) return signe + groupesMilliers(String(a.num));
+    return signe + groupesMilliers(String(a.num)) + '/' + groupesMilliers(String(a.den));
+  }
+
+  /** Décimal si l'écriture est finie, sinon fraction (pour les listes, ensembles…). */
+  function formaterValeur(v) {
+    if (typeof v === 'string') return v;
+    var f = Fraction.depuis(v);
+    return f.estDecimale() ? formaterNombre(f) : formaterFraction(f);
+  }
+
+  /**
+   * Nombre relatif.
+   *   formaterRelatif(5)  -> « (+ 5) »     formaterRelatif(-3) -> « (– 3) »
+   *   formaterRelatif(-3, { parentheses: false }) -> « – 3 »
+   *   formaterRelatif(5, { parentheses: false }) -> « 5 » ; avec signePlus: true -> « + 5 »
+   *   0 s'écrit toujours « 0 ».
+   *   Décimal si l'écriture est finie (– 0,75), sinon fraction (+ 1/3) ;
+   *   { fraction: true } force la fraction : (– 3/4).
+   */
+  function formaterRelatif(x, options) {
+    options = options || {};
+    var f = Fraction.depuis(x);
+    if (f.estZero()) return '0';
+    var corps = options.fraction ? formaterFraction(f.abs()) : formaterValeur(f.abs());
+    var signe = f.signe() < 0 ? '–' : '+';
+    if (options.parentheses !== false) return '(' + signe + NBSP + corps + ')';
+    if (f.signe() < 0) return MOINS + corps;
+    return options.signePlus ? '+' + NBSP + corps : corps;
+  }
+
+  /** Puissance : formaterPuissance('x', 2) -> x² ; (-3, 4) -> (– 3)⁴ ; (10, -3) -> 10⁻³. */
+  function formaterPuissance(base, exposant) {
+    var b;
+    if (typeof base === 'string') {
+      b = /^([a-zA-Z]|\d+(?:,\d+)?)$/.test(base) ? base : '(' + base + ')';
+    } else {
+      var f = Fraction.depuis(base);
+      b = formaterValeur(f);
+      if (f.signe() < 0 || !f.estDecimale()) b = '(' + b + ')';
+    }
+    return b + texteExposant(exposant);
+  }
+
+  /**
+   * Notation scientifique : 32000 -> « 3,2 · 10⁴ » ; -0,00105 -> « – 1,05 · 10⁻³ ».
+   * decimales (facultatif) : nombre de décimales de la mantisse (arrondi).
+   */
+  function formaterNotationScientifique(x, decimales) {
+    var f = Fraction.depuis(x);
+    if (f.estZero()) return '0';
+    var a = f.abs();
+    var n = String(a.num).length - String(a.den).length;
+    var m = a.divise(new Fraction(10).puissance(n));
+    while (m.compare(10) >= 0) { m = m.divise(10); n++; }
+    while (m.compare(1) < 0) { m = m.fois(10); n--; }
+    var texte;
+    if (decimales === undefined) {
+      texte = formaterValeur(m);
+    } else {
+      texte = m.versDecimal(decimales);
+      if (Fraction.depuis(texte).compare(10) >= 0) { n++; texte = '1'; }
+    }
+    return (f.signe() < 0 ? MOINS : '') + texte + NBSP + '·' + NBSP + '10' + texteExposant(n);
+  }
+
+  /**
+   * Racine : formaterRacine(2) -> √2 ; formaterRacine(8, 3) -> ∛8 ;
+   * formaterRacine('x + 1') -> √(x + 1) ; formaterRacine(2, 2, 3) -> 3√2.
+   */
+  function formaterRacine(radicande, indice, coefficient) {
+    var r = typeof radicande === 'string' ? radicande : formaterValeur(radicande);
+    if (!/^([a-zA-Z]|[\d',]+)$/.test(r)) r = '(' + r + ')';
+    var c = coefficient === undefined || coefficient === null ? '' :
+      (typeof coefficient === 'string' ? coefficient : formaterValeur(coefficient));
+    return c + (indice === 3 ? '∛' : '√') + r;
+  }
+
+  /**
+   * Montant en francs, comme sur les étiquettes suisses (point avant les centimes).
+   *   formaterMontant(7.2) -> « 7.20 francs »
+   *   formaterMontant(7.2, { style: 'CHF' }) -> « CHF 7.20 »
+   *   formaterMontant(1250.5) -> « 1'250.50 francs » ; 1.5 -> « 1.50 franc » (singulier sous 2)
+   * Arrondi au centime.
+   */
+  function formaterMontant(x, options) {
+    options = options || {};
+    var f = Fraction.depuis(x);
+    var t = f.abs().versDecimal(2, { fixe: true }).replace(',', '.');
+    var signe = f.signe() < 0 && t !== '0.00' ? MOINS : '';
+    if (options.style === 'CHF') return 'CHF' + NBSP + signe + t;
+    var unite = f.abs().compare(2) < 0 ? 'franc' : 'francs';
+    return signe + t + NBSP + unite;
+  }
+
+  /** Liste avec points-virgules : [1, 2, 3] -> « 1 ; 2 ; 3 ». Les textes sont repris tels quels. */
+  function formaterListe(elements) {
+    return elements.map(formaterValeur).join(NBSP + '; ');
+  }
+
+  /** Ensemble : [1, 2, 3] -> « { 1 ; 2 ; 3 } » ; [] -> « { } ». */
+  function formaterEnsemble(elements) {
+    if (!elements.length) return '{' + NBSP + '}';
+    return '{' + NBSP + formaterListe(elements) + NBSP + '}';
+  }
+
+  /** Coordonnées : formaterCoordonnees(2, -3) -> « (2 ; – 3) ». */
+  function formaterCoordonnees() {
+    return '(' + formaterListe(Array.prototype.slice.call(arguments)) + ')';
+  }
+
+  /**
+   * Ensemble de solutions :
+   *   formaterSolutions([3, -3]) -> « S = { – 3 ; 3 } » (nombres triés)
+   *   formaterSolutions([])      -> « S = { } »
+   *   formaterSolutions('R') ou (Maths.ENSEMBLES.R) -> « S = ℝ »
+   */
+  function formaterSolutions(solutions) {
+    var debut = 'S' + NBSP + '=' + NBSP;
+    if (solutions === 'R' || solutions === ENSEMBLES.R) return debut + ENSEMBLES.R;
+    var liste = solutions.slice();
+    var tousNombres = liste.every(function (v) { return typeof v !== 'string'; });
+    if (tousNombres) {
+      liste = liste.map(function (v) { return Fraction.depuis(v); })
+        .sort(function (a, b) { return a.compare(b); });
+    }
+    return debut + formaterEnsemble(liste);
+  }
+
+  /* ---------- Versions HTML ---------- */
+
+  function echapperHTML(t) {
+    return String(t).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  var html = {
+    /** Nombre exact, période barrée en CSS : <span class="periode">18</span> (voir commun.css). */
+    nombre: function (x) {
+      var f = Fraction.depuis(x);
+      var dev = f.developpementDecimal();
+      var h = (dev.signe ? MOINS : '') + groupesMilliers(dev.entier);
+      if (dev.avantPeriode || dev.periode) h += ',' + dev.avantPeriode;
+      if (dev.periode) h += '<span class="periode">' + dev.periode + '</span>';
+      return h;
+    },
+    /** Fraction empilée : <span class="frac"><span>3</span><span>4</span></span>. */
+    fraction: function (x) {
+      var f = Fraction.depuis(x);
+      var signe = f.signe() < 0 ? MOINS : '';
+      var a = f.abs();
+      if (a.estEntier()) return signe + groupesMilliers(String(a.num));
+      return signe + '<span class="frac" role="math" aria-label="' + a.num + ' sur ' + a.den + '">' +
+        '<span>' + groupesMilliers(String(a.num)) + '</span><span>' + groupesMilliers(String(a.den)) + '</span></span>';
+    },
+    echapper: echapperHTML
+  };
+
+  /* ---------- Écriture d'une expression ---------- */
+
+  var PRIORITE = { '+': 1, '-': 1, neg: 1.5, '*': 2, '/': 2, racine: 4, '^': 4, nombre: 5, lettre: 5 };
+
+  function versTexteNoeud(n) {
+    function enfant(e, min) {
+      var t = versTexteNoeud(e);
+      return PRIORITE[e.type] < min ? '(' + t + ')' : t;
+    }
+    switch (n.type) {
+      case 'nombre': return formaterNombre(n.valeur);
+      case 'lettre': return n.nom;
+      case 'neg': return MOINS + enfant(n.arg, 2);
+      case '^': {
+        var base = enfant(n.base, 5);
+        return base + texteExposant(n.exposant);
+      }
+      case 'racine': {
+        var a = versTexteNoeud(n.arg);
+        var simple = (n.arg.type === 'nombre' && n.arg.valeur.estDecimale()) || n.arg.type === 'lettre';
+        return (n.indice === 3 ? '∛' : '√') + (simple ? a : '(' + a + ')');
+      }
+      case '+': return enfant(n.g, 1) + ' + ' + enfant(n.d, 2);
+      case '-': return enfant(n.g, 1) + ' – ' + enfant(n.d, 2);
+      case '/':
+        if (n.symbole === ':') return enfant(n.g, 2) + ' : ' + enfant(n.d, 3);
+        return enfant(n.g, 3) + '/' + enfant(n.d, 3);
+      case '*': {
+        // (1/2)x plutôt que 1/2x, qui se lirait 1/(2x)
+        var g = n.g.type === '/' && n.g.symbole !== ':' && !n.g.parentheses
+          ? '(' + versTexteNoeud(n.g) + ')' : enfant(n.g, 2);
+        var d = enfant(n.d, 3);
+        var droiteImplicite = n.d.type === 'lettre' || n.d.type === 'racine' || /^\(/.test(d) ||
+          (n.d.type === '^' && n.d.base.type === 'lettre');
+        var implicite = droiteImplicite && n.g.type !== 'racine' && d.charAt(0) !== '–';
+        return implicite ? g + d : g + ' · ' + d;
+      }
+    }
+    return '?';
+  }
+
+  /**
+   * Écriture lisible d'une expression, selon l'aide-mémoire :
+   * « 3x² – 2(x + 1) », « 12 : (– 4) », « 2 · 3 », « √(x + 1) », « (x + 1)/2 ».
+   */
+  function versTexte(expr) { return versTexteNoeud(analyser(expr)); }
+
+  /* =====================================================================
+   * 9. Lecture de réponses particulières
+   * ===================================================================== */
+
+  /**
+   * Montant en francs saisi par l'élève -> Fraction, ou null si illisible.
+   * Accepte « 7.20 », « 7,20 », « 7 », « 7.– », « CHF 7.20 », « 7.20 fr. »,
+   * « 1'250.50 », « 1 250,50 ». Au plus deux décimales.
+   */
+  function lireMontant(texte) {
+    var t = String(texte).trim().replace(/[−–—]/g, '-')
+      .replace(/^(CHF|Fr\.?)\s*/i, '')
+      .replace(/\s*(CHF|francs?|fr\.?)$/i, '')
+      .trim();
+    var m = /^([+-]?)\s*(\d{1,3}(?:['’   ]\d{3})+|\d+)(?:[.,](\d{1,2}|-{1,2}))?$/.exec(t);
+    if (!m) return null;
+    var centimes = m[3] && /\d/.test(m[3]) ? (m[3] + '0').slice(0, 2) : '00';
+    var v = new Fraction(BigInt(m[2].replace(/\D/g, '') + centimes), 100n);
+    return m[1] === '-' ? v.oppose() : v;
+  }
+
+  /**
+   * Découpe une liste saisie avec des points-virgules : « 2 ; – 3 », « (2 ; – 3) »,
+   * « { 1 ; 2 } », « S = { – 3 ; 3 } » -> ['2', '– 3']… (textes, à analyser ensuite).
+   * Les accolades et « S = » sont retirés ; les parenthèses extérieures aussi
+   * s'il y a un point-virgule. « { } » ou « ∅ » -> [].
+   * Lève ErreurSaisie si un élément est vide.
+   */
+  function lireListe(texte) {
+    var t = String(texte).trim().replace(/^S\s*=\s*/i, '').trim();
+    if (t === '∅') return [];
+    if (/^\{[\s\S]*\}$/.test(t)) t = t.slice(1, -1).trim();
+    else if (/^\([\s\S]*\)$/.test(t) && t.indexOf(';') >= 0) t = t.slice(1, -1).trim();
+    if (t === '') return [];
+    var parties = t.split(';').map(function (p) { return p.trim(); });
+    if (parties.some(function (p) { return p === ''; })) {
+      throw new ErreurSaisie('Sépare les éléments par des points-virgules, sans élément vide.', 0);
+    }
+    return parties;
+  }
+
+  /**
+   * Ensemble de solutions saisi : renvoie { tous: true } pour « ℝ » (ou « R »),
+   * sinon { tous: false, elements: [textes] }. Chaque élément est vérifié (Maths.analyser).
+   */
+  function lireEnsemble(texte) {
+    var t = String(texte).trim().replace(/^S\s*=\s*/i, '').trim();
+    if (/^(ℝ|R|IR)$/.test(t)) return { tous: true, elements: [] };
+    var elements = lireListe(t);
+    elements.forEach(function (e) { analyser(e); });
+    return { tous: false, elements: elements };
+  }
+
+  /**
+   * Vrai si les deux ensembles contiennent les mêmes éléments (ordre et doublons
+   * sans importance, éléments comparés avec Maths.equivalentes).
+   * ensemblesEgaux('S = { 3 ; – 3 }', '{ – 3 ; 3 }') -> true
+   */
+  function ensemblesEgaux(a, b) {
+    var A = lireEnsemble(a), B = lireEnsemble(b);
+    if (A.tous || B.tous) return A.tous === B.tous;
+    function sansDoublons(liste) {
+      var res = [];
+      liste.forEach(function (e) {
+        if (!res.some(function (r) { return equivalentes(r, e); })) res.push(e);
+      });
+      return res;
+    }
+    var ea = sansDoublons(A.elements), eb = sansDoublons(B.elements);
+    if (ea.length !== eb.length) return false;
+    return ea.every(function (e) { return eb.some(function (f) { return equivalentes(e, f); }); });
+  }
+
   return {
-    version: '1.0.0',
+    version: '2.0.0',
     Alea: Alea,
     Fraction: Fraction,
     ErreurSaisie: ErreurSaisie,
     ErreurCalcul: ErreurCalcul,
+    ErreurIrrationnel: ErreurIrrationnel,
     pgcd: function (a, b) { return Number(pgcd(entierBig(a), entierBig(b))); },
+    // calcul et correction
     analyser: analyser,
     evaluer: evaluer,
+    evaluerApproche: evaluerApproche,
     lettres: lettres,
-    versTexte: versTexte,
     equivalentes: equivalentes,
     estReduite: estReduite,
     estReduiteOrdonnee: estReduiteOrdonnee,
     estFractionIrreductible: estFractionIrreductible,
     lireNotationScientifique: lireNotationScientifique,
     estNotationScientifique: estNotationScientifique,
-    formaterNombre: formaterNombre
+    lireMontant: lireMontant,
+    lireListe: lireListe,
+    lireEnsemble: lireEnsemble,
+    ensemblesEgaux: ensemblesEgaux,
+    // affichage
+    versTexte: versTexte,
+    formaterNombre: formaterNombre,
+    formaterFraction: formaterFraction,
+    formaterRelatif: formaterRelatif,
+    formaterPuissance: formaterPuissance,
+    formaterNotationScientifique: formaterNotationScientifique,
+    formaterRacine: formaterRacine,
+    formaterMontant: formaterMontant,
+    formaterListe: formaterListe,
+    formaterEnsemble: formaterEnsemble,
+    formaterCoordonnees: formaterCoordonnees,
+    formaterSolutions: formaterSolutions,
+    texteExposant: texteExposant,
+    html: html,
+    ENSEMBLES: ENSEMBLES,
+    MOINS: MOINS
   };
 });

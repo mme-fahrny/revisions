@@ -14,6 +14,7 @@
  *   .etiquette                              petite pastille (« 10e », « niveau 2 »)
  *   .aide-memoire                           encadré de rappel
  *   .visuellement-cache                     texte pour lecteurs d'écran
+ *   .periode, .frac                         période barrée, fraction empilée (Maths.html)
  */
 
 /* ---------- Jetons de couleur ---------- */
@@ -387,7 +388,26 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   color: var(--texte);
 }
 .apercu:empty::before { content: "\00a0"; }
-.apercu .periode { text-decoration: overline; }
+
+/* ---------- Écriture mathématique (Maths.html, aperçu du clavier) ---------- */
+/* Période d'une écriture décimale : 1,18 avec une barre sur 18 */
+.periode {
+  text-decoration: overline;
+  text-decoration-thickness: .08em;
+  text-underline-offset: 0;
+}
+/* Fraction empilée : <span class="frac"><span>3</span><span>4</span></span> */
+.frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 .1em;
+  font-size: .9em;
+  line-height: 1.15;
+}
+.frac > span { padding: 0 .15em; }
+.frac > span:first-child { border-bottom: .08em solid currentColor; }
 
 /* ---------- Pied de page ---------- */
 .pied {

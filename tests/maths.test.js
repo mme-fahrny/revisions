@@ -20,6 +20,8 @@ function egal(obtenu, attendu, msg) {
 }
 function vrai(v, msg) { egal(v, true, msg); }
 function faux(v, msg) { egal(v, false, msg); }
+/** Compare des textes affichés en lisant l'espace insécable comme une espace ordinaire. */
+function egalT(obtenu, attendu, msg) { egal(String(obtenu).replace(/\u00a0/g, ' '), attendu, msg); }
 function leve(fn, Type, msg) {
   try { fn(); } catch (e) {
     if (!Type || e instanceof Type) return;
@@ -102,7 +104,7 @@ test('Fraction : comparaison', function () {
 test('Fraction : conversion décimale (format suisse)', function () {
   egal(new F(3, 4).valeur(), 0.75);
   egal(new F(2, 3).versDecimal(3), '0,667');
-  egal(new F(-2, 3).versDecimal(2), '-0,67');
+  egal(new F(-2, 3).versDecimal(2), '– 0,67');
   egal(new F(1, 2).versDecimal(2, { fixe: true }), '0,50');
   egal(new F(1234567, 2).versDecimal(1), "617'283,5");
   egal(new F(1, 1000).versDecimal(2), '0');
@@ -166,11 +168,28 @@ test('Analyseur : erreurs de saisie', function () {
   });
   leve(function () { M.evaluer('1/(x-2)', { x: 2 }); }, M.ErreurCalcul);
 });
-test('versTexte : écriture lisible', function () {
-  egal(M.versTexte('3x^2-2(x+1)'), '3x^2 − 2(x + 1)');
-  egal(M.versTexte('1/2x'), '(1/2)x');
-  egal(M.versTexte('a-(-3)'), 'a − (−3)');
-  egal(M.versTexte('2,5*3'), '2,5 × 3');
+test('versTexte : écriture de l’aide-mémoire', function () {
+  egalT(M.versTexte('3x^2-2(x+1)'), '3x² – 2(x + 1)');
+  egalT(M.versTexte('1/2x'), '(1/2)x');
+  egalT(M.versTexte('a-(-3)'), 'a – (– 3)');
+  egalT(M.versTexte('2,5*3'), '2,5 · 3');
+  egalT(M.versTexte('2×3'), '2 · 3', '× devient ·');
+  egalT(M.versTexte('12÷4'), '12 : 4', '÷ devient :');
+  egalT(M.versTexte('12 : (-4)'), '12 : (– 4)');
+  egalT(M.versTexte('12:4·2'), '12 : 4 · 2');
+  egalT(M.versTexte('(x+1)/2'), '(x + 1)/2');
+  egalT(M.versTexte('10^-3'), '10⁻³');
+  egalT(M.versTexte('(-3)^4'), '(– 3)⁴');
+  egalT(M.versTexte('-2^2'), '– 2²');
+  egalT(M.versTexte('√(x+1)'), '√(x + 1)');
+  egalT(M.versTexte('3√2'), '3√2');
+  egalT(M.versTexte('∛8'), '∛8');
+  egalT(M.versTexte('31500 + 2'), "31'500 + 2");
+  egalT(M.versTexte('1,1818…'), '1,1̅8̅', 'période barrée');
+  // aucune trace de ×, ÷, − ni « x » comme signe de multiplication
+  ['2*3', '2x·3', 'a·b', '6:3', '-x-1'].forEach(function (e) {
+    vrai(!/[×÷−*]/.test(M.versTexte(e)), e);
+  });
 });
 
 /* ---------- Équivalence ---------- */
@@ -255,6 +274,206 @@ test('Notation scientifique', function () {
   egal(n.mantisse.toString(), '-21/20');
   egal(n.valeur.toString(), '-21/20000');
   egal(M.lireNotationScientifique('4×10⁻³').valeur.versDecimal(), '0,004');
+});
+
+/* ---------- Saisie avec les symboles de l'aide-mémoire ---------- */
+test('Saisie : multiplication · * × et implicite', function () {
+  egal(val('3·4'), '12');
+  egal(val('3 * 4'), '12');
+  egal(val('3 × 4'), '12');
+  egal(val('3x', { x: 5 }), '15');
+  egal(val('2(x + 1)', { x: 4 }), '10');
+  egal(val('a(b + 5)', { a: 2, b: 1 }), '12');
+  egal(val('x · y', { x: 3, y: 7 }), '21');
+});
+test('Saisie : division « : » et barre de fraction « / »', function () {
+  egal(val('12 : 4'), '3');
+  egal(val('12 ÷ 4'), '3');
+  egal(val('12/4'), '3');
+  egal(val('12 : 4 · 2'), '6', 'de gauche à droite');
+  egal(val('(– 12) : (+ 3)'), '-4');
+  egal(M.analyser('3 : 4').symbole, ':');
+  egal(M.analyser('3/4').symbole, '/');
+});
+test('Saisie : signes moins - – −', function () {
+  egal(val('5 – 7'), '-2');
+  egal(val('5 - 7'), '-2');
+  egal(val('5 − 7'), '-2');
+  egal(val('– 3 + 1'), '-2');
+  egal(val('(– 3) · (– 2)'), '6');
+});
+test('Saisie : virgule décimale et milliers (apostrophe, espace, rien)', function () {
+  egal(val("31'500"), '31500');
+  egal(val('31 500'), '31500');
+  egal(val('31500'), '31500');
+  egal(val('1 000 000 + 1'), '1000001');
+  egal(val("1'234,5"), '2469/2');
+  egal(val('12 345,25'), '49381/4');
+  egal(val('0,5 + 0.25'), '3/4');
+  leve(function () { M.analyser('3 45'); }, M.ErreurSaisie, 'groupe de 2 chiffres');
+  leve(function () { M.analyser('1 0000'); }, M.ErreurSaisie, 'groupe de 4 chiffres');
+});
+test('Saisie : écriture décimale périodique (barre ou « … »)', function () {
+  egal(val('1,1̅8̅'), '13/11', 'barre sur 18');
+  egal(val('1,18̅'), '107/90', 'barre sur 8 seulement : 1,1888…');
+  egal(val('0,3̅'), '1/3');
+  egal(val('1,1818…'), '13/11');
+  egal(val('1,1818...'), '13/11');
+  egal(val('0,1666…'), '1/6');
+  egal(val('0,333…'), '1/3');
+  egal(val('2,142857142857…'), '15/7');
+  egal(F.depuis('0,1666…').toString(), '1/6');
+  egal(F.depuis('1,1̅8̅').toString(), '13/11');
+  leve(function () { M.analyser('0,12…'); }, M.ErreurSaisie, 'période non répétée');
+  leve(function () { M.analyser('1,1̅8'); }, M.ErreurSaisie, 'barre pas sur les derniers chiffres');
+  vrai(M.equivalentes('0,3̅', '1/3'));
+  vrai(M.equivalentes('1,1818…', '13/11'));
+});
+test('Saisie : racines √ et ∛', function () {
+  egal(val('√9'), '3');
+  egal(val('√(9/4)'), '3/2');
+  egal(val('√x', { x: 49 }), '7');
+  egal(val('∛8'), '2');
+  egal(val('∛(-27)'), '-3');
+  egal(val('3√4'), '6');
+  egal(val('√4x', { x: 3 }), '6', '√4x = √4 · x');
+  egal(val('√x^2', { x: -3 }), '3', '√x² = √(x²)');
+  leve(function () { M.evaluer('√2'); }, M.ErreurIrrationnel);
+  leve(function () { M.evaluer('√(-4)'); }, M.ErreurCalcul);
+  leve(function () { M.analyser('√'); }, M.ErreurSaisie);
+  leve(function () { M.analyser('2 + √'); }, M.ErreurSaisie);
+  vrai(Math.abs(M.evaluerApproche('√2') - Math.SQRT2) < 1e-15);
+  vrai(M.equivalentes('√8', '2√2'));
+  vrai(M.equivalentes('√12 + √3', '3√3'));
+  vrai(M.equivalentes('√(4x^2)', '2√(x^2)'));
+  vrai(M.equivalentes('(√x)^2', 'x'), 'calculé seulement là où x ≥ 0');
+  faux(M.equivalentes('√8', '3√2'));
+  faux(M.equivalentes('√(x^2)', 'x'), '√(x²) = |x|');
+  faux(M.equivalentes('√2', '1,41421356'), 'arrondi refusé');
+  faux(M.equivalentes('√(a + b)', '√a + √b'));
+});
+test('Saisie : point-virgule refusé dans une expression', function () {
+  leve(function () { M.analyser('2 ; 3'); }, M.ErreurSaisie);
+});
+
+/* ---------- Formatage (affichage) ---------- */
+test('Formatage : nombres décimaux', function () {
+  egalT(M.formaterNombre(31500), "31'500");
+  egalT(M.formaterNombre(1000000), "1'000'000");
+  egalT(M.formaterNombre(999), '999');
+  egalT(M.formaterNombre(-2.5), '– 2,5');
+  egalT(M.formaterNombre('13/11'), '1,1̅8̅');
+  egalT(M.formaterNombre('1/6'), '0,16̅');
+  egalT(M.formaterNombre('13/11', null, { periode: 'parentheses' }), '1,(18)');
+  egalT(M.formaterNombre(2 / 3, 2), '0,67');
+  egalT(M.formaterNombre(-1234.5678, 2), "– 1'234,57");
+  egalT(M.formaterNombre(-0.001, 2), '0', 'pas de « – 0 »');
+  egal(M.formaterNombre(-3), '– 3', 'espace insécable après le signe');
+  egal(M.formaterNombre(31500), "31'500", 'apostrophe droite');
+});
+test('Formatage : fractions', function () {
+  egalT(M.formaterFraction('6/8'), '3/4');
+  egalT(M.formaterFraction('-3/4'), '– 3/4');
+  egalT(M.formaterFraction(5), '5');
+  egalT(M.formaterFraction('2000/3'), "2'000/3");
+});
+test('Formatage : relatifs', function () {
+  egalT(M.formaterRelatif(5), '(+ 5)');
+  egalT(M.formaterRelatif(-3), '(– 3)');
+  egalT(M.formaterRelatif(-2.5), '(– 2,5)');
+  egalT(M.formaterRelatif('-3/4'), '(– 0,75)', 'décimal si l’écriture est finie');
+  egalT(M.formaterRelatif('-3/4', { fraction: true }), '(– 3/4)');
+  egalT(M.formaterRelatif('1/3'), '(+ 1/3)');
+  egalT(M.formaterRelatif(0), '0');
+  egalT(M.formaterRelatif(5, { parentheses: false }), '5');
+  egalT(M.formaterRelatif(-3, { parentheses: false }), '– 3');
+  egalT(M.formaterRelatif(5, { parentheses: false, signePlus: true }), '+ 5');
+  // un calcul de 9e : (+ 5) + (– 3)
+  egalT(M.formaterRelatif(5) + ' + ' + M.formaterRelatif(-3) + ' = ' + M.formaterRelatif(2), '(+ 5) + (– 3) = (+ 2)');
+});
+test('Formatage : puissances et notation scientifique', function () {
+  egalT(M.formaterPuissance('x', 2), 'x²');
+  egalT(M.formaterPuissance(10, -3), '10⁻³');
+  egalT(M.formaterPuissance(-3, 4), '(– 3)⁴');
+  egalT(M.formaterPuissance('2/3', 2), '(2/3)²');
+  egalT(M.formaterPuissance('2x', 3), '(2x)³');
+  egalT(M.formaterPuissance(2, 10), '2¹⁰');
+  egalT(M.formaterNotationScientifique(32000), '3,2 · 10⁴');
+  egalT(M.formaterNotationScientifique(-0.00105), '– 1,05 · 10⁻³');
+  egalT(M.formaterNotationScientifique(7), '7 · 10⁰');
+  egalT(M.formaterNotationScientifique(149600000), '1,496 · 10⁸');
+  egalT(M.formaterNotationScientifique(123456, 2), '1,23 · 10⁵');
+  egalT(M.formaterNotationScientifique(99999, 2), '1 · 10⁵', 'arrondi qui passe à 10');
+  egalT(M.formaterNotationScientifique(0), '0');
+  // ce qui est affiché est relu comme notation scientifique correcte
+  vrai(M.estNotationScientifique(M.formaterNotationScientifique(-0.00105)));
+  egal(M.lireNotationScientifique(M.formaterNotationScientifique(32000)).valeur.toString(), '32000');
+});
+test('Formatage : racines', function () {
+  egalT(M.formaterRacine(2), '√2');
+  egalT(M.formaterRacine(8, 3), '∛8');
+  egalT(M.formaterRacine('x + 1'), '√(x + 1)');
+  egalT(M.formaterRacine('x'), '√x');
+  egalT(M.formaterRacine(2, 2, 3), '3√2');
+  egalT(M.formaterRacine(1000), "√1'000");
+});
+test('Formatage et lecture : montants en francs', function () {
+  egalT(M.formaterMontant(7.2), '7.20 francs');
+  egalT(M.formaterMontant(7.2, { style: 'CHF' }), 'CHF 7.20');
+  egalT(M.formaterMontant(1250.5), "1'250.50 francs");
+  egalT(M.formaterMontant(1.5), '1.50 franc');
+  egalT(M.formaterMontant(0.05), '0.05 franc');
+  egalT(M.formaterMontant('2/3'), '0.67 franc');
+  egalT(M.formaterMontant(-7.2), '– 7.20 francs');
+  ['7.20', '7,20', '7.2', 'CHF 7.20', '7.20 fr.', 'Fr. 7.20', '7.20 francs'].forEach(function (t) {
+    egal(String(M.lireMontant(t)), '36/5', t);
+  });
+  egal(String(M.lireMontant('7.–')), '7');
+  egal(String(M.lireMontant('7.-')), '7');
+  egal(String(M.lireMontant('7')), '7');
+  egal(String(M.lireMontant("1'250.50")), '2501/2');
+  egal(String(M.lireMontant('1 250,50')), '2501/2');
+  egal(M.lireMontant('7.205'), null, 'trois décimales');
+  egal(M.lireMontant('sept'), null);
+});
+test('Formatage : listes, coordonnées, ensembles, solutions', function () {
+  egalT(M.formaterListe([1, 2, 3]), '1 ; 2 ; 3');
+  egal(M.formaterListe([1, 2]), '1 ; 2', 'espace insécable avant « ; »');
+  egalT('ppmc (' + M.formaterListe([4, 6]) + ') = 12', 'ppmc (4 ; 6) = 12');
+  egalT(M.formaterCoordonnees(2, -3), '(2 ; – 3)');
+  egalT(M.formaterCoordonnees(-1.5, '1/3'), '(– 1,5 ; 1/3)');
+  egalT(M.formaterEnsemble([1, 2, 3]), '{ 1 ; 2 ; 3 }');
+  egalT(M.formaterEnsemble([]), '{ }');
+  egalT(M.formaterSolutions([3, -3]), 'S = { – 3 ; 3 }');
+  egalT(M.formaterSolutions(['2/3']), 'S = { 2/3 }');
+  egalT(M.formaterSolutions([]), 'S = { }');
+  egalT(M.formaterSolutions('R'), 'S = ℝ');
+  egalT(M.formaterSolutions(M.ENSEMBLES.R), 'S = ℝ');
+  egal(M.ENSEMBLES.N + M.ENSEMBLES.Z + M.ENSEMBLES.D + M.ENSEMBLES.Q + M.ENSEMBLES.R, 'ℕℤ𝔻ℚℝ');
+});
+test('Lecture : listes et ensembles de solutions', function () {
+  egal(M.lireListe('2 ; – 3').join('|'), '2|– 3');
+  egal(M.lireListe('(2 ; – 3)').join('|'), '2|– 3');
+  egal(M.lireListe('S = { – 3 ; 3 }').join('|'), '– 3|3');
+  egal(M.lireListe('{ }').length, 0);
+  egal(M.lireListe('∅').length, 0);
+  egal(M.lireListe('(x + 1)').join('|'), '(x + 1)');
+  leve(function () { M.lireListe('1 ; ; 2'); }, M.ErreurSaisie);
+  vrai(M.lireEnsemble('S = ℝ').tous);
+  vrai(M.ensemblesEgaux('S = { 3 ; – 3 }', '{ – 3 ; 3 }'));
+  vrai(M.ensemblesEgaux('{ 0,5 ; 3 ; 3 }', 'S = { 3 ; 1/2 }'), 'doublons et écritures équivalentes');
+  vrai(M.ensemblesEgaux('{ }', 'S = { }'));
+  vrai(M.ensemblesEgaux('ℝ', 'S = ℝ'));
+  faux(M.ensemblesEgaux('{ 3 }', '{ – 3 ; 3 }'));
+  faux(M.ensemblesEgaux('{ }', 'ℝ'));
+  leve(function () { M.lireEnsemble('{ 2 + }'); }, M.ErreurSaisie);
+});
+test('HTML : période barrée et fraction empilée', function () {
+  egal(M.html.nombre('13/11'), '1,<span class="periode">18</span>');
+  egal(M.html.nombre(-31500), "– 31'500");
+  vrai(/class="frac"/.test(M.html.fraction('-3/4')));
+  vrai(/^– <span/.test(M.html.fraction('-3/4')));
+  egal(M.html.fraction(4), '4');
 });
 
 console.log('\n' + reussis + ' test(s) réussi(s), ' + echecs + ' échec(s).');
