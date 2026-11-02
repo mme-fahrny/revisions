@@ -1,0 +1,410 @@
+/*
+ * commun.css — styles partagés de toutes les applis
+ * --------------------------------------------------
+ * Mobile d'abord (utilisable dès 360 px), thème clair/sombre automatique,
+ * zones de clic d'au moins 44 px, focus clavier visible.
+ *
+ * Classes utiles :
+ *   .entete, .entete-titre, [data-profil]   en-tête commun (profil.js le remplit)
+ *   .page                                   contenu centré
+ *   .section, .grille-cartes, .carte        page d'accueil, listes
+ *   .bouton, .bouton-secondaire, .bouton-discret
+ *   .champ                                  zone de saisie
+ *   .retour.juste / .retour.faux / .retour.info   message après une réponse
+ *   .etiquette                              petite pastille (« 10e », « niveau 2 »)
+ *   .aide-memoire                           encadré de rappel
+ *   .visuellement-cache                     texte pour lecteurs d'écran
+ */
+
+/* ---------- Jetons de couleur ---------- */
+:root {
+  color-scheme: light dark;
+  --fond: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef1f5;
+  --texte: #1b1f24;
+  --texte-doux: #4d5560;
+  --bordure: #c9cfd8;
+  --accent: #1d5bb8;          /* bleu maths : contraste ≈ 6:1 sur blanc */
+  --accent-texte: #ffffff;
+  --accent-doux: #e3ecfa;
+  --sciences: #1b6e45;        /* vert sciences */
+  --sciences-doux: #e1f2e8;
+  --juste: #1b6e3a;
+  --juste-doux: #e3f4e8;
+  --faux: #b0261b;
+  --faux-doux: #fbe7e5;
+  --info: #7a4d00;
+  --info-doux: #fdf1dc;
+  --focus: #c25e00;
+  --ombre: 0 1px 2px rgba(20, 30, 50, .08), 0 2px 8px rgba(20, 30, 50, .06);
+
+  --rayon: 12px;
+  --espace: 1rem;
+  --police: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --police-maths: "Cambria Math", "STIX Two Math", "Latin Modern Math", Cambria, Georgia, serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fond: #13161b;
+    --surface: #1d2128;
+    --surface-2: #272c35;
+    --texte: #e9ecf0;
+    --texte-doux: #b1b8c3;
+    --bordure: #434b57;
+    --accent: #8db8ff;
+    --accent-texte: #0d1626;
+    --accent-doux: #1e2c44;
+    --sciences: #74d39f;
+    --sciences-doux: #183327;
+    --juste: #7fd99c;
+    --juste-doux: #173323;
+    --faux: #ff9d93;
+    --faux-doux: #3b1d1b;
+    --info: #f3c06b;
+    --info-doux: #362a15;
+    --focus: #ffb35c;
+    --ombre: 0 1px 2px rgba(0, 0, 0, .4);
+  }
+}
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--fond);
+  color: var(--texte);
+  font-family: var(--police);
+  font-size: 1.125rem;          /* 18 px : très lisible sur téléphone */
+  line-height: 1.55;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { line-height: 1.25; margin: 1.2em 0 .5em; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.3rem; }
+h3 { font-size: 1.12rem; }
+p { margin: 0 0 1em; }
+
+a { color: var(--accent); text-underline-offset: .15em; }
+img, svg, canvas, video { max-width: 100%; height: auto; }
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.maths { font-family: var(--police-maths); font-size: 1.1em; }
+
+.visuellement-cache {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.lien-evitement {
+  position: absolute; left: .5rem; top: -4rem;
+  background: var(--surface); color: var(--texte);
+  padding: .6rem 1rem; border-radius: var(--rayon); z-index: 10;
+}
+.lien-evitement:focus { top: .5rem; }
+
+/* ---------- En-tête commun ---------- */
+.entete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+  padding: .5rem var(--espace);
+  background: var(--surface);
+  border-bottom: 1px solid var(--bordure);
+}
+.entete-titre {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 700;
+  color: var(--texte);
+  text-decoration: none;
+}
+.entete-titre:hover { text-decoration: underline; }
+
+.profil-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem .75rem;
+}
+.profil-actuel { color: var(--texte-doux); font-size: .95rem; }
+.profil-actuel strong { color: var(--texte); }
+
+/* ---------- Mise en page ---------- */
+.page {
+  width: 100%;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--espace);
+}
+.intro { color: var(--texte-doux); }
+
+.section { margin-top: 1.5rem; }
+.section > h2 { display: flex; align-items: center; gap: .5rem; }
+.section > h2::before {
+  content: "";
+  width: .5rem; height: 1.2em;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.section-sciences > h2::before { background: var(--sciences); }
+
+.grille-cartes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--espace);
+  list-style: none;
+  margin: 0; padding: 0;
+}
+@media (min-width: 40rem) {
+  .grille-cartes { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 60rem) {
+  .grille-cartes { grid-template-columns: repeat(3, 1fr); }
+}
+
+.carte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding: 1rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-left: 6px solid var(--accent);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+}
+.section-sciences .carte { border-left-color: var(--sciences); }
+.carte h3 { margin: 0; font-size: 1.15rem; }
+.carte p { margin: 0; color: var(--texte-doux); font-size: 1rem; }
+.carte a {
+  color: var(--texte);
+  text-decoration: none;
+}
+/* toute la carte est cliquable */
+.carte a::after { content: ""; position: absolute; inset: 0; border-radius: var(--rayon); }
+.carte:hover { border-color: var(--accent); }
+.section-sciences .carte:hover { border-color: var(--sciences); }
+.carte:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.carte a:focus-visible { outline: none; }
+
+.etiquette {
+  display: inline-block;
+  padding: .05rem .55rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--texte);
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.aide-memoire {
+  padding: .9rem 1rem;
+  margin: 1rem 0;
+  background: var(--info-doux);
+  border-left: 5px solid var(--info);
+  border-radius: var(--rayon);
+}
+
+/* ---------- Boutons ---------- */
+.bouton, .bouton-secondaire, .bouton-discret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-height: 44px;
+  min-width: 44px;
+  padding: .55rem 1.1rem;
+  border-radius: var(--rayon);
+  border: 2px solid var(--accent);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.bouton { background: var(--accent); color: var(--accent-texte); }
+.bouton:hover { filter: brightness(1.08); }
+.bouton-secondaire { background: var(--surface); color: var(--accent); }
+.bouton-secondaire:hover { background: var(--accent-doux); }
+.bouton-discret {
+  background: transparent; color: var(--accent);
+  border-color: var(--bordure);
+  font-size: .95rem;
+  padding: .45rem .8rem;
+}
+.bouton-discret:hover { background: var(--accent-doux); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
+
+/* ---------- Saisie ---------- */
+.champ {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: .55rem .8rem;
+  font: inherit;
+  font-size: 1.25rem;
+  color: var(--texte);
+  background: var(--surface);
+  border: 2px solid var(--bordure);
+  border-radius: var(--rayon);
+}
+.champ:focus { border-color: var(--accent); }
+.champ:focus-visible { outline-offset: 1px; }
+
+/* ---------- Retours après une réponse ---------- */
+.retour {
+  padding: .8rem 1rem;
+  margin: 1rem 0;
+  border-radius: var(--rayon);
+  border-left: 5px solid var(--bordure);
+  background: var(--surface-2);
+}
+.retour:empty { display: none; }
+.retour.juste { background: var(--juste-doux); border-color: var(--juste); }
+.retour.faux  { background: var(--faux-doux);  border-color: var(--faux); }
+.retour.info  { background: var(--info-doux);  border-color: var(--info); }
+.retour.juste strong:first-child { color: var(--juste); }
+.retour.faux strong:first-child  { color: var(--faux); }
+
+/* ---------- Fenêtre de choix du profil (profil.js) ---------- */
+.profil-dialogue {
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1.25rem;
+  color: var(--texte);
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
+}
+.profil-dialogue::backdrop { background: rgba(10, 14, 20, .55); }
+.profil-dialogue h2 { margin-top: 0; }
+.profil-dialogue fieldset {
+  border: 0; margin: 0 0 1rem; padding: 0;
+}
+.profil-dialogue legend { font-weight: 700; margin-bottom: .4rem; padding: 0; }
+.choix-groupe { display: flex; flex-wrap: wrap; gap: .5rem; }
+.choix {
+  position: relative;
+  flex: 1 1 4rem;
+}
+.choix input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.choix span {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 48px;
+  padding: .4rem .6rem;
+  border: 2px solid var(--bordure);
+  border-radius: var(--rayon);
+  font-weight: 600;
+  text-align: center;
+}
+.choix input:checked + span {
+  border-color: var(--accent);
+  background: var(--accent-doux);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.choix input:checked + span::before { content: "✓ "; white-space: pre; }
+.choix input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.profil-message { color: var(--faux); min-height: 1.5em; margin: 0 0 .5rem; }
+
+/* ---------- Clavier mathématique (clavier.js) ---------- */
+.clavier {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .4rem;
+  margin-top: .6rem;
+  padding: .5rem;
+  background: var(--surface-2);
+  border-radius: var(--rayon);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.clavier button {
+  min-height: 48px;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  font-family: var(--police-maths);
+  font-size: 1.3rem;
+  color: var(--texte);
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.clavier button:hover { background: var(--accent-doux); }
+.clavier button:active { transform: translateY(1px); }
+.clavier .touche-op { color: var(--accent); font-weight: 700; }
+.clavier .touche-lettre { font-style: italic; }
+.clavier .touche-effacer { font-family: var(--police); font-size: 1.1rem; }
+.clavier .touche-valider {
+  font-family: var(--police);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent-texte);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.clavier .touche-valider:hover { background: var(--accent); filter: brightness(1.08); }
+
+.apercu {
+  min-height: 2.2em;
+  margin-top: .4rem;
+  padding: .2rem .4rem;
+  font-family: var(--police-maths);
+  font-size: 1.3rem;
+  color: var(--texte);
+}
+.apercu:empty::before { content: "\00a0"; }
+.apercu .periode { text-decoration: overline; }
+
+/* ---------- Pied de page ---------- */
+.pied {
+  max-width: 60rem;
+  margin: 2rem auto 0;
+  padding: 1rem var(--espace) 2rem;
+  color: var(--texte-doux);
+  font-size: .9rem;
+  border-top: 1px solid var(--bordure);
+}
+
+/* ---------- Mouvement réduit ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
