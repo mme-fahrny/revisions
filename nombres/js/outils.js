@@ -709,6 +709,12 @@
       throw e;
     }
     if (!lu.simple) return illisible('Écris un seul nombre (ou une fraction a/b), pas un calcul.');
+    if (r.reels) {
+      // bornes réelles (√2, √3…) : comparaison en valeurs approchées
+      var x = lu.valeur.valeur(), eps = 1e-12;
+      if (x > r.minR + eps && x < r.maxR - eps) return { juste: true, statut: 'juste', message: '' };
+      return { juste: false, statut: 'faux', message: x <= r.minR ? 'Ton nombre est trop petit : il doit être plus grand que ' + r.minTexte + ' ≈ ' + Maths.formaterNombre(Maths.Fraction.depuis(Number(r.minR.toFixed(4)))) + '.' : 'Ton nombre est trop grand : il doit être plus petit que ' + r.maxTexte + ' ≈ ' + Maths.formaterNombre(Maths.Fraction.depuis(Number(r.maxR.toFixed(4)))) + '.' };
+    }
     var v = lu.valeur, min = val(r.min), max = val(r.max);
     if (v.compare(min) > 0 && v.compare(max) < 0) return { juste: true, statut: 'juste', message: '' };
     if (v.egal(min) || v.egal(max)) return { juste: false, statut: 'faux', message: 'Ton nombre est égal à une des bornes : il doit être strictement compris entre les deux.' };
@@ -840,6 +846,10 @@
         return { justes: [tx.join(' ; ')], faux: inv.join() === tx.join() ? [] : [inv.join(' ; ')] };
       }
       case 'entre': {
+        if (r.reels) {
+          var milieu = Maths.Fraction.depuis(Number(((r.minR + r.maxR) / 2).toFixed(3)));
+          return { justes: [Maths.formaterNombre(milieu)], faux: [Maths.formaterNombre(Maths.Fraction.depuis(Math.floor(r.minR * 10) / 10)), Maths.formaterNombre(Maths.Fraction.depuis(Math.ceil(r.maxR * 10 + 1) / 10))] };
+        }
         var mi = val(r.min).plus(val(r.max)).divise(2);
         return { justes: [texteFraction(mi)], faux: [texteFraction(val(r.min)), texteFraction(val(r.max)), texteFraction(val(r.max).plus(1))] };
       }
@@ -873,6 +883,7 @@
       visuelCorrection: o.visuelCorrection || null,
       nombres: (o.nombres || []).map(val),
       controle: o.controle || null,
+      signature: o.signature || null,   // empreinte comparée aux exemples de référence (catalogue.js)
       pieges: o.pieges || [],
       estimation: !!o.estimation,
       clavier: o.clavier || 'nombres',
@@ -899,7 +910,9 @@
         return (r.valeur.estDecimale() && !r.valeur.estEntier() && u ? H.n(r.valeur) : H.f(r.valeur)) + u;
       case 'montant': return H.chf(r.valeur);
       case 'liste': return (r.textesHtml || r.valeurs.map(function (v) { return typeof v === 'number' ? H.n(Maths.Fraction.depuis(v)) : H.f(v); })).join(NBSP + '; ');
-      case 'entre': return 'un nombre strictement compris entre ' + H.f(r.min) + ' et ' + H.f(r.max) + ', par exemple ' + H.f(val(r.min).plus(val(r.max)).divise(2));
+      case 'entre':
+        if (r.reels) return 'un nombre strictement compris entre ' + r.minTexte + ' et ' + r.maxTexte + ', par exemple ' + H.n(Maths.Fraction.depuis(Number(((r.minR + r.maxR) / 2).toFixed(3))));
+        return 'un nombre strictement compris entre ' + H.f(r.min) + ' et ' + H.f(r.max) + ', par exemple ' + H.f(val(r.min).plus(val(r.max)).divise(2));
       case 'coloriage': return String(val(r.valeur).fois(r.parts).num) + ' parts sur ' + r.parts;
     }
     return '';

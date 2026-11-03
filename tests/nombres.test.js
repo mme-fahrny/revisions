@@ -29,6 +29,8 @@ var reussis = 0, echecs = 0;
 var messagesEchecs = {};
 function echec(cle, detail) {
   echecs++;
+  // DETAIL=1 : regroupe les échecs par objectif et difficulté (utile pour le calibrage)
+  if (process.env.DETAIL) cle += ' — ' + String(detail).split(' ').slice(0, 4).join(' ').replace(/\[.*$/, '');
   if (!messagesEchecs[cle]) messagesEchecs[cle] = { n: 0, exemple: detail };
   messagesEchecs[cle].n++;
 }
@@ -170,6 +172,11 @@ function controler(q, ident) {
         verifierQue(c.exprs[imin] === c.cle && bonnes[0].cle === c.cle, 'minimum faux', ident);
         return;
       }
+      case 'entreReels': {
+        var ra = approche(c.a), rb = approche(c.b);
+        verifierQue(ra < rb && procheDe(q.reponse.minR, ra) && procheDe(q.reponse.maxR, rb), 'intercaler (réels) : bornes', ident);
+        return;
+      }
       case 'entre': {
         var mn = exact(c.a), mx = exact(c.b);
         verifierQue(mn.compare(mx) < 0 && F.depuis(q.reponse.min).egal(mn) && F.depuis(q.reponse.max).egal(mx), 'intercaler : bornes', ident);
@@ -211,6 +218,12 @@ function controler(q, ident) {
         var mant = mm ? parseFloat(mm[1].replace(/'/g, '').replace(',', '.')) : NaN;
         var estSci = mant >= 1 && mant < 10;
         verifierQue(estSci === c.vrai && /^Vrai/.test(texteBrut(bonnes[0].h)) === c.vrai, 'notation scientifique (vrai/faux)', ident + ' ' + c.texte);
+        return;
+      }
+      case 'comboRacines': {
+        var k = Math.sqrt(c.a) * Math.sqrt(c.b), rn = Math.pow(c.c, 1 / c.n);
+        var att = c.op === '+' ? k + rn : k - rn;
+        verifierQue(procheDe(att, c.res) && Number.isInteger(Math.round(k)) && Math.abs(k - Math.round(k)) < 1e-9 && q.reponse.valeur.egal(new F(c.res)), 'calcul de racines faux', ident);
         return;
       }
       case 'racineN': {
@@ -331,7 +344,13 @@ function verifierBornes(q, o, d, ident) {
     verifierQue(okDecimal || okFraction, 'dénominateur ou décimales hors bornes', ident + ' : ' + x + ' (dén. ⩽ ' + maxDen + ', décimales ⩽ ' + maxDec + ')');
   });
   var ops = 0, etapes = 0;
-  if (q.controle && q.controle.conversion) { ops = 1; etapes = 1; }
+  // Conversion d'écriture, ou comparaison de nombres donnés (√15 et 2√14, 3 · 10⁴ et 9 · 10³) :
+  // les nombres sont lus, pas calculés ; on compte une seule étape.
+  var lecture = q.controle && /^(compare|compareApprox|ordre|minimum|maximum|encadrement|entreReels|ensemble)$/.test(q.controle.type || '');
+  if (q.controle && (q.controle.conversion || lecture)) { ops = 1; etapes = 1; }
+  // Le générateur peut déclarer le travail réel de l'élève quand le texte de contrôle contient
+  // des écritures qui ne sont pas des calculs (3 · 10⁵, a^m · a^n à écrire en une puissance…).
+  else if (q.controle && q.controle.mesure) { ops = q.controle.mesure.ops; etapes = q.controle.mesure.etapes; }
   else textesControle(q.controle).forEach(function (t) {
     var m;
     try { m = mesurer(Maths.analyser(t)); } catch (e) { echec('texte de contrôle illisible', ident + ' ' + t); return; }
@@ -379,10 +398,10 @@ function verifierContenu(q, o, profil, d, ident) {
   if (o.module === 'A' && o.annee === 11 && profil.niveau === 1) {
     verifierQue(!(q.reponse.type === 'entre' && q.reponse.reels), '11e N1 : intercalation entre deux réels', ident);
   }
-  if (o.module === 'B' && o.annee === 10 && profil.niveau === 1) {
+  if (o.module === 'B' && o.annee === 10 && profil.annee === 10 && profil.niveau === 1) {
     verifierQue(!EXPOSANT_NEGATIF.test(h), '10e N1 (puissances) : exposant négatif', ident);
   }
-  if (o.module === 'B' && o.annee === 10 && profil.niveau === 2 && d < 4 && o.id !== 'B10-proprietes') {
+  if (o.module === 'B' && o.annee === 10 && profil.annee === 10 && profil.niveau === 2 && d < 4 && o.id !== 'B10-proprietes') {
     verifierQue(!EXPOSANT_NEGATIF.test(h), '10e N2 : exposant négatif avant D4', ident);
   }
   if (o.module === 'C' && profil.niveau === 1) {
@@ -440,6 +459,7 @@ var seulement = process.argv[2]; // ex. « node tests/nombres.test.js B » pour 
 modules.forEach(function (mod) {
   if (seulement && seulement !== mod) return;
   [9, 10, 11].forEach(function (annee) {
+    if (process.argv[3] && Number(process.argv[3]) !== annee) return; // « node tests/nombres.test.js A 9 »
     [1, 2].forEach(function (niveau) {
       var profil = { annee: annee, niveau: niveau };
       var dispo = Nombres.objectifsPour(mod, profil);
@@ -487,6 +507,7 @@ modules.forEach(function (mod) {
 // Chaque objectif a été exercé
 Nombres.objectifs.forEach(function (o) {
   if (seulement && o.module !== seulement) return;
+  if (process.argv[3]) return;
   verifierQue(parObjectif[o.id] > 0, 'objectif jamais généré', o.id);
 });
 

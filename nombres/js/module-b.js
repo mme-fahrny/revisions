@@ -138,14 +138,15 @@
 
   function questionTrouverCarre(alea, p) {
     var cube = p >= 2 && alea.suivant() < 0.4;
-    var max = cube ? [0, 5, 6, 8, 10, 12][p] : [0, 10, 12, 15, 20, 25][p];
+    // 9e : carrés ⩽ 144 (12²), cubes ⩽ 125 (5³)
+    var max = cube ? [0, 3, 4, 5, 5][p] : [0, 8, 10, 12, 12][p];
     var k = alea.entier(2, max);
     var n = cube ? k * k * k : k * k;
     var options = [{ v: n, juste: true }];
     var essais = 0;
     while (options.length < 4 && essais++ < 100) {
       var x = n + alea.choix([-1, 1]) * alea.entier(1, Math.max(3, Math.round(n / 10)));
-      if (x <= 1 || options.some(function (o) { return o.v === x; })) continue;
+      if (x <= 1 || x > [0, 64, 100, 144, 144][p] || options.some(function (o) { return o.v === x; })) continue;
       var r = cube ? Math.round(Math.cbrt(x)) : Math.round(Math.sqrt(x));
       if ((cube ? r * r * r : r * r) === x) continue;
       options.push({ v: x, juste: false });
@@ -174,10 +175,10 @@
 
   function vraiFauxCarreCube(alea, p) {
     var cube = alea.suivant() < 0.5;
-    var k = alea.entier(2, cube ? 10 : 20);
+    var k = alea.entier(2, cube ? [0, 3, 4, 5, 5][p] : [0, 8, 10, 12, 12][p]);
     var vrai = alea.suivant() < 0.5;
     var n = cube ? k * k * k : k * k;
-    if (!vrai) n += alea.choix([-1, 1]) * alea.entier(1, 3);
+    if (!vrai) n += (n + 3 > [0, 64, 100, 144, 144][p] ? -1 : alea.choix([-1, 1])) * alea.entier(1, 3);
     var r = cube ? Math.round(Math.cbrt(n)) : Math.round(Math.sqrt(n));
     vrai = (cube ? r * r * r : r * r) === n;
     var nom = cube ? 'cube parfait' : 'carré parfait';
@@ -202,7 +203,7 @@
 
   function questionCarreDe(alea, p) {
     var cube = alea.suivant() < 0.35;
-    var k = alea.entier(2, cube ? [0, 5, 6, 8, 10, 12][p] : [0, 10, 12, 15, 20, 30][p]);
+    var k = alea.entier(2, cube ? [0, 3, 4, 5, 5][p] : [0, 8, 10, 12, 12][p]);
     var n = cube ? k * k * k : k * k;
     return O.saisie({
       type: 'directe',
@@ -223,30 +224,36 @@
    * Priorité des opérations avec des puissances (9e : naturels ; 10e : relatifs, racines)
    * ===================================================================== */
 
+  /**
+   * Priorités avec des puissances. Modèles classés par nombre d'opérations :
+   * D1 : deux opérations ; D2 : + a² + b² ; D3 : trois opérations ; D4 : avec une racine (10e).
+   * relatifs : bases négatives et « – a² » (10e N2 D4, 11e).
+   */
   function arbrePuissances(alea, p, relatifs, racines) {
     function e(min, max) { return A.f(relatifs ? alea.entierNonNul(-max, max) : alea.entier(min, max)); }
     function pos(min, max) { return A.f(alea.entier(min, max)); }
-    var modeles = ['a+b²·c', '(a+b)²', 'a·b²', 'a²+b²', 'a–b²', '(a·b)²–c'];
-    if (p >= 3) modeles = modeles.concat(['a+b³:c', '(a–b)³+c']);
-    if (racines) modeles = modeles.concat(['√c+a·b²', '–a²+b', '(–a)²+b', 'a·√c–b²']);
+    var modeles = ['(a+b)²', 'a·b²', 'a–b²'];
+    if (p >= 2) modeles = modeles.concat(['a²+b²']);
+    if (p >= 3) modeles = modeles.concat(['a+b²·c', '(a·b)²–c', 'a+b³:c', '(a–b)³+c']);
+    if (relatifs) modeles = modeles.concat(['–a²+b', '(–a)²+b']);
+    if (racines && p >= 4) modeles = ['√c+a·b²', 'a·√c–b²'].concat(relatifs ? ['–a²+b', '(–a)²+b'] : []);
     var mod = alea.choix(modeles);
     switch (mod) {
       case 'a+b²·c': return A.o('+', e(1, 12), A.o('·', A.p(e(2, 6), 2), e(2, 9)));
       case '(a+b)²': return A.p(A.par(A.o('+', e(1, 6), e(1, 6))), 2);
       case 'a·b²': return A.o('·', e(2, 9), A.p(e(2, 6), 2));
       case 'a²+b²': return A.o('+', A.p(e(2, 9), 2), A.p(e(2, 9), 2));
-      case 'a–b²': { var b = alea.entier(2, 5); return A.o('–', pos(b * b + (relatifs ? -20 : 1), b * b + 40), A.p(relatifs ? e(2, 5) : A.f(b), 2)); }
+      case 'a–b²': { var b = alea.entier(2, p <= 1 ? 4 : 5); return A.o('–', pos(b * b + 1, Math.min(b * b + 40, 20 * p)), A.p(relatifs ? e(2, 5) : A.f(b), 2)); }
       case '(a·b)²–c': return A.o('–', A.p(A.par(A.o('·', e(2, 4), e(2, 4))), 2), pos(1, 20));
       case 'a+b³:c': { var c = alea.choix([2, 4, 8]); return A.o('+', e(1, 20), A.o(':', A.p(A.f(alea.choix([2, 4, 6])), 3), A.f(c))); }
       case '(a–b)³+c': return A.o('+', A.p(A.par(A.o('–', e(1, 6), e(1, 6))), 3), e(1, 20));
       case '√c+a·b²': return A.o('+', A.r(A.f(alea.choix([4, 9, 16, 25, 36, 49, 64, 81, 100]))), A.o('·', e(2, 5), A.p(e(2, 4), 2)));
-      case '–a²+b': { var x = alea.entier(2, 9); return A.o('+', { op: 'neg2', g: A.p(A.f(x), 2), feuille: false }, e(1, 30)); }
-      case '(–a)²+b': return A.o('+', A.p(A.f(-alea.entier(2, 9)), 2), e(1, 30));
+      case '–a²+b': { var x = alea.entier(2, 9); return A.o('+', { op: 'neg2', g: A.p(A.f(x), 2), feuille: false }, e(1, 20)); }
+      case '(–a)²+b': return A.o('+', A.p(A.f(-alea.entier(2, 9)), 2), e(1, 20));
       default: return A.o('–', A.o('·', e(2, 5), A.r(A.f(alea.choix([4, 9, 16, 25, 36, 49])))), A.p(e(2, 4), 2));
     }
   }
 
-  /** « – a² » : l'opposé de a² (le signe ne fait pas partie de la base). Transformé en 0 – a² pour le calcul. */
   function sansNeg2(t) {
     if (t.feuille) return t;
     if (t.op === 'neg2') return { op: '·', g: A.f(-1), d: t.g, moinsDevant: true };
@@ -298,8 +305,9 @@
       etapes: O.etapes(et),
       verification: 'Vérification : refais le calcul en écrivant chaque étape sur une nouvelle ligne.',
       rubrique: R.priorites,
-      nombres: A.feuilles(calc),
-      controle: { expr: A.texte(calc) },
+      nombres: A.feuilles(calc).filter(function (x) { return !(neg2 && x.egal(-1)); }),
+      // « – a² + b » : le signe devant la puissance n'est pas une opération
+      controle: { expr: neg2 ? '-(' + t.g.g.g.v.toString() + '^2)+(' + t.d.v.toString() + ')' : A.texte(calc) },
       attenduHtml: H.n(v)
     });
   }
@@ -378,8 +386,42 @@
    * 10e : écritures (puissance, racine, notation scientifique), exposants négatifs
    * ===================================================================== */
 
-  function questionPuissance10(alea, p) {
-    var n = alea.entierNonNul(p <= 2 ? -4 : -9, p <= 2 ? 6 : 12);
+  /** 10e N1 : un même nombre écrit avec une puissance, une racine… Trouver l'écriture qui ne convient pas. */
+  var ECRITURES = [
+    { n: 16, egales: [['2⁴', '2^4'], ['4²', '4^2'], ['√256', '√256']], fausses: [['2⁸', '2^8'], ['8²', '8^2'], ['√16', '√16']] },
+    { n: 64, egales: [['2⁶', '2^6'], ['4³', '4^3'], ['8²', '8^2']], fausses: [['6²', '6^2'], ['3⁴', '3^4'], ['2⁸', '2^8']] },
+    { n: 81, egales: [['3⁴', '3^4'], ['9²', '9^2'], ['√6561', '√6561']], fausses: [['3⁵', '3^5'], ['4³', '4^3'], ['3³', '3^3']] },
+    { n: 100, egales: [['10²', '10^2'], ['√10\'000', '√10000']], fausses: [['10³', '10^3'], ['50²', '50^2'], ['2⁵⁰', '2^50']] },
+    { n: 27, egales: [['3³', '3^3'], ['√729', '√729']], fausses: [['9³', '9^3'], ['3⁹', '3^9'], ['2⁷', '2^7']] },
+    { n: 125, egales: [['5³', '5^3'], ['√15\'625', '√15625']], fausses: [['3⁵', '3^5'], ['25³', '25^3'], ['5²', '5^2']] },
+    { n: 8, egales: [['2³', '2^3'], ['√64', '√64'], ['∛512', '∛512']], fausses: [['3²', '3^2'], ['4²', '4^2'], ['√8', '√8']] },
+    { n: 1000, egales: [['10³', '10^3'], ['√1\'000\'000', '√1000000']], fausses: [['10⁴', '10^4'], ['3¹⁰', '3^10'], ['100³', '100^3']] }
+  ];
+
+  function questionEcrituresNombre(alea, p) {
+    var e = alea.choix(ECRITURES.filter(function (x) { return x.n <= [0, 20, 100, 200, 300][p]; }));
+    var egales = alea.melanger(e.egales).slice(0, Math.min(3, e.egales.length));
+    var intrus = alea.choix(e.fausses);
+    var choix = egales.map(function (x) { return { h: m(x[0]), juste: false, cle: x[1], valeur: x[1], message: m(x[0]) + ' est bien égal à ' + H.n(fr(e.n)) + '.' }; });
+    choix.push({ h: m(intrus[0]), juste: true, cle: 'intrus', valeur: intrus[1], message: '' });
+    var vi = M.evaluerApproche(intrus[1]);
+    return O.choix({
+      type: 'directe',
+      enonce: '<p>Une seule de ces écritures n\'est <strong>pas</strong> égale à ' + m(H.n(fr(e.n))) + '. Laquelle ?</p>',
+      consigne: 'Choisis l\'intrus.',
+      choix: choix,
+      indice: 'Calcule chaque puissance (produit de facteurs égaux) ; pour une racine, cherche le nombre dont le carré (ou le cube) vaut le nombre sous la racine.',
+      etapes: O.etapes([['L\'intrus est ' + m(intrus[0]) + ' : il vaut ' + (Number.isInteger(vi) && vi < 1e9 ? H.n(fr(vi)) : 'un autre nombre') + ', et non ' + H.n(fr(e.n)) + '.', '']]),
+      rubrique: R.puissances,
+      nombres: [fr(e.n)],
+      controle: { type: 'intrus', expr: String(e.n), mesure: { ops: 1, etapes: 1 } }
+    }, alea);
+  }
+
+  /** Puissance de 10 : 10ⁿ ↔ écriture décimale. Exposants négatifs seulement si opts.negatifs. */
+  function questionPuissance10(alea, p, opts) {
+    var neg = !!(opts && opts.negatifs);
+    var n = neg && alea.suivant() < 0.6 ? -alea.entier(1, 6) : alea.entier(2, [0, 4, 6, 9, 12][p]);
     var v = fr(10).puissance(n);
     var sens = alea.suivant() < 0.5 ? 'versDecimal' : 'versPuissance';
     if (sens === 'versDecimal') {
@@ -389,13 +431,13 @@
         consigne: 'Réponse en <strong>écriture décimale</strong> (un nombre, sans puissance).',
         indice: n > 0 ? pui(10, n) + ' : 1 suivi de ' + n + ' zéros.' : pui(10, n) + ' = 1/' + pui(10, -n) + ' : le chiffre 1 est au rang n° ' + (-n) + ' après la virgule.',
         reponse: { type: 'valeur', valeur: v, forme: 'decimal' },
-        pieges: n < 0 ? [{ valeur: fr(10).puissance(-n).oppose(), message: 'Un exposant négatif ne donne pas un nombre négatif : ' + pui(10, n) + ' est l\'inverse de ' + pui(10, -n) + '.' }, { valeur: fr(10).puissance(n - 1), message: 'Un zéro de trop : le 1 est à la ' + (-n) + 'e décimale.' }, { valeur: fr(10).puissance(n + 1), message: 'Il manque un zéro : le 1 est à la ' + (-n) + 'e décimale.' }]
+        pieges: n < 0 ? [{ valeur: fr(n), message: pui(10, n) + ' n\'est pas égal à ' + H.n(fr(n)) + ' : l\'exposant négatif indique l\'inverse, ' + pui(10, n) + ' = 1/' + pui(10, -n) + '.' }, { valeur: fr(10).puissance(-n).oppose(), message: 'Un exposant négatif ne donne pas un nombre négatif : ' + pui(10, n) + ' est l\'inverse de ' + pui(10, -n) + '.' }, { valeur: fr(10).puissance(n - 1), message: 'Un zéro de trop : le 1 est à la ' + (-n) + 'e décimale.' }, { valeur: fr(10).puissance(n + 1), message: 'Il manque un zéro : le 1 est à la ' + (-n) + 'e décimale.' }]
           : [{ valeur: fr(10 * n), message: pui(10, n) + ' n\'est pas 10 · ' + n + '.' }],
         etapes: O.etapes(n > 0 ? [[pui(10, n) + ' est le produit de ' + n + ' facteurs 10 : 1 suivi de ' + n + ' zéros.', m(pui(10, n) + ' = ' + H.n(v))]] : [['Un exposant négatif indique l\'inverse.', m(pui(10, n) + ' = ' + H.fh(1, pui(10, -n)) + ' = ' + H.fh(1, H.n(fr(10).puissance(-n))) + ' = ' + H.n(v))]]),
         verification: n < 0 ? 'Vérification : ' + H.n(v) + ' a ' + (-n) + ' décimales. ✓' : 'Vérification : ' + H.n(v) + ' a ' + n + ' zéros. ✓',
         rubrique: R.puissances,
         nombres: [fr(n)],
-        controle: { expr: '10^(' + n + ')' }
+        controle: { expr: '10^(' + n + ')', conversion: true }
       });
     }
     return O.saisie({
@@ -409,7 +451,7 @@
       etapes: O.etapes([[n > 0 ? 'Il y a ' + n + ' zéros après le 1.' : 'Le chiffre 1 est au ' + (-n) + 'e rang après la virgule : c\'est 1/' + H.n(fr(10).puissance(-n)) + '.', m(H.n(v) + ' = ' + pui(10, n))]]),
       rubrique: R.puissances,
       nombres: [fr(n)],
-      controle: { expr: '10^(' + n + ')' }
+      controle: { expr: '10^(' + n + ')', conversion: true }
     });
   }
 
@@ -471,10 +513,16 @@
     { nom: 'micro', s: 'µ', e: -6 }, { nom: 'nano', s: 'n', e: -9 }
   ];
 
-  function visuelPrefixes(surligne) { return { type: 'prefixes', prefixes: PREFIXES, surligne: surligne }; }
+  /** Tableau des préfixes ; sansNegatifs : la colonne « puissance » n'affiche pas 10⁻ⁿ (10e N1). */
+  function visuelPrefixes(surligne, sansNegatifs) { return { type: 'prefixes', prefixes: PREFIXES, surligne: surligne, sansNegatifs: !!sansNegatifs }; }
+  function positifs() { return PREFIXES.filter(function (x) { return x.e > 0; }); }
+  /** Exposants négatifs autorisés : 10e niveau 2 en difficulté 4, et 11e. */
+  function expNeg(c, p) { return !!c && (c.annee >= 11 || (c.niveau === 2 && p >= 4)); }
+  function choixParDifficulte(alea, p, listes) { return alea.choix(listes[Math.min(p, listes.length) - 1]); }
 
-  function questionPrefixePuissance(alea, p) {
-    var pr = alea.choix(p <= 2 ? PREFIXES.filter(function (x) { return [12, 9, 6, 3, -3].indexOf(x.e) >= 0; }) : PREFIXES);
+  function questionPrefixePuissance(alea, p, opts) {
+    var neg = !!(opts && opts.negatifs);
+    var pr = alea.choix(neg ? PREFIXES : positifs());
     var sens = alea.suivant() < 0.6 ? 'puissance' : 'prefixe';
     if (sens === 'puissance') {
       return O.saisie({
@@ -487,13 +535,13 @@
         pieges: [{ exposant: -pr.e, message: pr.e > 0 ? pr.nom + ' multiplie l\'unité : l\'exposant est positif.' : pr.nom + ' divise l\'unité : l\'exposant est négatif.' }],
         etapes: O.etapes([['Je lis le tableau des préfixes.', m('1 ' + pr.s + '… = ' + pui(10, pr.e) + ' …')]]),
         rubrique: R.prefixes,
-        visuel: visuelPrefixes(null),
-        visuelCorrection: visuelPrefixes(pr.s),
+        visuel: visuelPrefixes(null, !neg),
+        visuelCorrection: visuelPrefixes(pr.s, !neg),
         nombres: [fr(pr.e)],
         controle: { expr: '10^(' + pr.e + ')' }
       });
     }
-    var choix = PREFIXES.filter(function (x) { return x !== pr; });
+    var choix = (neg ? PREFIXES : positifs()).filter(function (x) { return x !== pr; });
     choix = alea.melanger(choix).slice(0, 3).concat([pr]).map(function (x) {
       return { h: x.nom + ' (' + x.s + ')', juste: x === pr, cle: x.nom, message: x === pr ? '' : x.nom + ' correspond à ' + pui(10, x.e) + '.' };
     });
@@ -505,7 +553,7 @@
       indice: pr.e > 0 ? 'Le préfixe multiplie l\'unité.' : 'Le préfixe divise l\'unité.',
       etapes: O.etapes([['Je lis le tableau des préfixes : ' + pr.nom + ' (' + pr.s + ') = ' + pui(10, pr.e) + '.', '']]),
       rubrique: R.prefixes,
-      visuelCorrection: visuelPrefixes(pr.s),
+      visuelCorrection: visuelPrefixes(pr.s, !neg),
       nombres: [fr(pr.e)],
       controle: { type: 'aucun' }
     }, alea);
@@ -517,11 +565,13 @@
     { u: 'W', nom: 'watts', prefixes: ['k', 'M', 'G'], vers: 'W', ctx: function (x, s) { return s === 'G' ? 'Une centrale produit une puissance de ' + x + ' GW.' : s === 'M' ? 'Une éolienne a une puissance de ' + x + ' MW.' : 'Un panneau solaire a une puissance de ' + x + ' kW.'; } }
   ];
 
-  function questionConversionPrefixe(alea, p) {
+  function questionConversionPrefixe(alea, p, opts) {
+    var neg = !!(opts && opts.negatifs);
     var g = alea.choix(GRANDEURS);
-    var s = alea.choix(g.prefixes);
+    var s = alea.choix(g.prefixes.filter(function (x) { return neg || PREFIXES.filter(function (y) { return y.s === x; })[0].e > 0; }));
     var pr = PREFIXES.filter(function (x) { return x.s === s; })[0];
-    var x = alea.choix(p <= 2 ? [fr(2), fr(3), fr(5), fr(8), fr(12), fr(25), fr(64), fr(128), fr(250)] : [M.Fraction.depuis('1,5'), M.Fraction.depuis('2,4'), fr(16), fr(32), fr(350), fr(450), M.Fraction.depuis('7,5'), fr(256)]);
+    var x = choixParDifficulte(alea, p, [[fr(2), fr(3), fr(5), fr(8), fr(12), fr(16)], [fr(25), fr(32), fr(64), M.Fraction.depuis('1,5'), M.Fraction.depuis('2,4')],
+      [fr(128), fr(150), fr(200), M.Fraction.depuis('7,5'), M.Fraction.depuis('2,4')], [fr(250), fr(256), fr(300), M.Fraction.depuis('1,25'), M.Fraction.depuis('7,5')]]);
     var v = x.fois(fr(10).puissance(pr.e));
     var unite = g.u === 'o' ? 'octets' : g.nom;
     return O.saisie({
@@ -536,10 +586,43 @@
       etapes: O.etapes([['Je lis le tableau des préfixes : 1 ' + s + g.u + ' = ' + pui(10, pr.e) + ' ' + g.u + '.', ''], ['Je multiplie.', m(H.n(x) + ' ' + s + g.u + ' = ' + H.n(x) + ' · ' + pui(10, pr.e) + ' ' + g.u + ' = ' + H.sci(v) + ' ' + g.u + (Math.abs(pr.e) <= 9 ? ' = ' + H.n(v) + ' ' + g.u : ''))]]),
       verification: pr.e > 0 ? 'Vérification : l\'unité ' + g.u + ' est plus petite que ' + s + g.u + ', donc on obtient un nombre plus grand que ' + M.formaterNombre(x) + '. ✓' : 'Vérification : l\'unité ' + g.u + ' est plus grande que ' + s + g.u + ', donc on obtient un nombre plus petit que ' + M.formaterNombre(x) + '. ✓',
       rubrique: R.prefixes,
-      visuel: visuelPrefixes(null),
-      visuelCorrection: visuelPrefixes(s),
+      visuel: visuelPrefixes(null, !neg),
+      visuelCorrection: visuelPrefixes(s, !neg),
       nombres: [x],
-      controle: { expr: '(' + x.toString() + ')*10^(' + pr.e + ')' }
+      controle: { expr: '(' + x.toString() + ')*10^(' + pr.e + ')', conversion: true }
+    });
+  }
+
+  /**
+   * 10e N1 : milli, centi, micro sans exposant négatif (écriture décimale) : 8 mm = 0,008 m.
+   * Les puissances négatives (10⁻³) ne sont introduites qu'au niveau 2, en difficulté 4.
+   */
+  function questionPrefixeDecimal(alea, p) {
+    var pr = alea.choix(p <= 2 ? [{ nom: 'milli', s: 'm', d: 1000 }, { nom: 'centi', s: 'c', d: 100 }] : [{ nom: 'milli', s: 'm', d: 1000 }, { nom: 'centi', s: 'c', d: 100 }, { nom: 'micro', s: 'µ', d: 1000000 }]);
+    var x = alea.choix([null, [fr(2), fr(5), fr(8), fr(12), fr(15)], [fr(25), fr(40), fr(75), fr(90)], [fr(120), fr(150), fr(180), fr(200)], [fr(250), fr(300), fr(45), fr(60)]][p]);
+    var ctx = alea.choix([
+      { t: function (v) { return 'Une fourmi mesure ' + v + ' ' + pr.s + 'm.'; }, u: 'm', nom: 'mètres' },
+      { t: function (v) { return 'Une goutte de sirop a une masse de ' + v + ' ' + pr.s + 'g.'; }, u: 'g', nom: 'grammes' }
+    ]);
+    var v = x.divise(pr.d);
+    return O.saisie({
+      type: 'probleme',
+      enonce: '<p>' + ctx.t(H.n(x)) + '</p><p>Combien cela fait-il en ' + ctx.nom + ' (' + ctx.u + ') ?</p>',
+      consigne: 'Réponse en <strong>écriture décimale</strong>.',
+      suffixe: ctx.u,
+      indice: 'Le préfixe ' + pr.nom + ' (' + pr.s + ') veut dire « divisé par ' + H.n(fr(pr.d)) + ' » : 1 ' + pr.s + ctx.u + ' = ' + M.formaterNombre(fr(1, pr.d)) + ' ' + ctx.u + '.',
+      reponse: { type: 'valeur', valeur: v, forme: 'decimal', unite: [ctx.u, ctx.nom] },
+      pieges: [{ valeur: x.fois(pr.d), message: 'Tu as multiplié : l\'unité ' + ctx.u + ' est plus grande que ' + pr.s + ctx.u + ', le nombre doit devenir plus petit.' }, { valeur: x.divise(pr.d === 1000 ? 100 : 1000), message: 'Erreur de préfixe : relis le tableau (1 ' + pr.s + ctx.u + ' = ' + M.formaterNombre(fr(1, pr.d)) + ' ' + ctx.u + ').' }],
+      etapes: O.etapes([
+        ['Je lis le tableau des préfixes : 1 ' + pr.s + ctx.u + ' = ' + H.n(fr(1, pr.d)) + ' ' + ctx.u + '.', ''],
+        ['Je divise par ' + H.n(fr(pr.d)) + ' (je déplace la virgule vers la gauche).', m(H.n(x) + ' ' + pr.s + ctx.u + ' = ' + H.n(x) + ' : ' + H.n(fr(pr.d)) + ' ' + ctx.u + ' = ' + H.n(v) + ' ' + ctx.u)]
+      ]),
+      verification: 'Vérification : l\'unité ' + ctx.u + ' est plus grande, donc on obtient un nombre plus petit que ' + M.formaterNombre(x) + '. ✓',
+      rubrique: R.prefixes,
+      visuel: visuelPrefixes(null, true),
+      visuelCorrection: visuelPrefixes(pr.s === 'c' ? 'c' : pr.s, true),
+      nombres: [x],
+      controle: { expr: '(' + x.toString() + ')*(1/' + pr.d + ')' }
     });
   }
 
@@ -561,12 +644,13 @@
         etapes: O.etapes([['J\'écris les capacités en octets.', m(H.n(cap) + ' To = ' + H.n(cap) + ' · ' + pui(10, 12) + ' o ; ' + H.n(photo) + ' Mo = ' + H.n(photo) + ' · ' + pui(10, 6) + ' o')], ['Je divise.', m(H.fh(H.n(cap) + ' · ' + pui(10, 12), H.n(photo) + ' · ' + pui(10, 6)) + ' = ' + H.n(cap.divise(photo)) + ' · ' + pui(10, 6) + ' = ' + H.n(n))]]),
         verification: 'Vérification : ' + H.n(n) + ' · ' + H.n(photo) + ' Mo = ' + H.n(n.fois(photo)) + ' Mo = ' + H.n(cap) + ' To. ✓',
         rubrique: R.prefixes,
-        visuel: visuelPrefixes(null),
+        visuel: visuelPrefixes(null, true),
         nombres: [cap, photo],
-        controle: { expr: '(' + cap.toString() + ')*10^12/((' + photo.toString() + ')*10^6)' }
+        // deux conversions (en parallèle), puis une division
+        controle: { expr: '(' + cap.toString() + ')*10^12/((' + photo.toString() + ')*10^6)', mesure: { ops: 3, etapes: 2 } }
       });
     }
-    var debit = alea.choix([fr(50), fr(100), fr(200), fr(250)]); // Mo par seconde ... en Mo/s
+    var debit = alea.choix([fr(50), fr(100), fr(200), fr(250)].filter(function (x) { return x.compare(Math.max(50, [0, 20, 100, 200, 300][p])) <= 0; })); // Mo par seconde
     var taille = alea.choix([fr(2), fr(4), fr(5), fr(10)]); // Go
     var t = taille.fois(1000).divise(debit);
     return O.saisie({
@@ -580,7 +664,7 @@
       etapes: O.etapes([['Je convertis la taille en Mo.', m(H.n(taille) + ' Go = ' + H.n(taille.fois(1000)) + ' Mo')], ['Je divise par le débit.', m(H.n(taille.fois(1000)) + ' : ' + H.n(debit) + ' = ' + H.n(t))]]),
       verification: 'Vérification : ' + H.n(t) + ' s · ' + H.n(debit) + ' Mo/s = ' + H.n(taille.fois(1000)) + ' Mo. ✓',
       rubrique: R.prefixes,
-      visuel: visuelPrefixes(null),
+      visuel: visuelPrefixes(null, true),
       nombres: [debit, taille],
       controle: { expr: '(' + taille.toString() + ')*1000/(' + debit.toString() + ')' }
     });
@@ -590,18 +674,24 @@
    * 10e : notation scientifique
    * ===================================================================== */
 
-  function tirerNombreSci(alea, p) {
-    var dec = alea.entier(0, p <= 2 ? 1 : 3);
+  /**
+   * Nombre à écrire en notation scientifique. D1 : entier (deux chiffres significatifs) ;
+   * D2 : décimaux, exposant jusqu'à 9 ; D3-D4 : mantisse plus longue, exposant jusqu'à 12.
+   * Exposant négatif seulement si neg (10e N2 D4, 11e).
+   */
+  function tirerNombreSci(alea, p, neg) {
+    var dec = alea.entier(0, p <= 1 ? 1 : p === 2 ? 2 : 3);
     var mant = new F(alea.entier(Math.pow(10, dec), 10 * Math.pow(10, dec) - 1), Math.pow(10, dec));
     while (mant.fois(Math.pow(10, dec)).estEntier() && dec > 0 && Number(mant.fois(Math.pow(10, dec)).num) % 10 === 0) mant = mant.plus(fr(1, Math.pow(10, dec)));
-    var e = p <= 1 ? alea.entier(3, 6) : p === 2 ? alea.entier(3, 9) : alea.entierNonNul(p >= 4 ? -9 : -5, p >= 4 ? 12 : 8);
+    var e = p <= 1 ? alea.entier(3, 7) : p === 2 ? alea.entier(2, 9) : alea.entier(3, p >= 4 ? 12 : 9);
+    if (neg && alea.suivant() < 0.5) e = -alea.entier(1, p >= 4 ? 9 : 5);
     return { mant: mant, e: e, v: mant.fois(fr(10).puissance(e)) };
   }
 
-  function questionEcrireSci(alea, p) {
-    var s = tirerNombreSci(alea, p);
+  function questionEcrireSci(alea, p, opts) {
+    var s = tirerNombreSci(alea, p, opts && opts.negatifs);
     var depart, departH, kDec = 0;
-    var nonNormalise = p >= 4 && alea.suivant() < 0.5;
+    var nonNormalise = p >= 3 && alea.suivant() < 0.5;
     if (nonNormalise) {
       var k = alea.choix([-2, -1, 1, 2]);
       kDec = k;
@@ -629,12 +719,13 @@
       verification: 'Vérification : ' + H.n(s.mant) + ' est bien compris entre 1 et 10. ✓',
       rubrique: R.notationScientifique,
       nombres: [s.mant, fr(s.e)],
-      controle: { expr: '(' + s.mant.toString() + ')*10^(' + s.e + ')' }
+      controle: { expr: '(' + s.mant.toString() + ')*10^(' + s.e + ')', conversion: true },
+      signature: 'sci:' + s.v.toString()
     });
   }
 
-  function questionSciVersDecimal(alea, p) {
-    var s = tirerNombreSci(alea, Math.min(p, 3));
+  function questionSciVersDecimal(alea, p, opts) {
+    var s = tirerNombreSci(alea, Math.min(p, 3), opts && opts.negatifs);
     if (Math.abs(s.e) > 7) s = { mant: s.mant, e: s.e > 0 ? 6 : -5, v: s.mant.fois(fr(10).puissance(s.e > 0 ? 6 : -5)) };
     return O.saisie({
       type: 'directe',
@@ -646,13 +737,13 @@
       etapes: O.etapes([['Je déplace la virgule de ' + Math.abs(s.e) + ' rang' + (Math.abs(s.e) > 1 ? 's' : '') + ' vers la ' + (s.e > 0 ? 'droite' : 'gauche') + '.', m(H.sciME(s.mant, s.e) + ' = ' + H.n(s.v))]]),
       rubrique: R.notationScientifique,
       nombres: [s.mant, fr(s.e)],
-      controle: { expr: '(' + s.mant.toString() + ')*10^(' + s.e + ')' }
+      controle: { expr: '(' + s.mant.toString() + ')*10^(' + s.e + ')', conversion: true }
     });
   }
 
-  function vraiFauxSci(alea, p) {
+  function vraiFauxSci(alea, p, opts) {
     var genre = alea.choix(['petit', 'grand', 'ok', 'ok', 'zero']);
-    var s = tirerNombreSci(alea, p);
+    var s = tirerNombreSci(alea, p, opts && opts.negatifs);
     var mantTexte, e = s.e;
     if (genre === 'petit') { mantTexte = M.formaterNombre(s.mant.divise(10)); e = s.e + 1; }
     else if (genre === 'grand') { mantTexte = M.formaterNombre(s.mant.fois(alea.choix([10, 100]))); e = s.e - 1; }
@@ -692,11 +783,13 @@
     { q: 'la vitesse de la lumière (environ 300\'000 km/s)', e: 8, u: 'm/s' }
   ];
 
-  function questionOrdreGrandeurSci(alea, p) {
-    var o = alea.choix(OBJETS);
+  function questionOrdreGrandeurSci(alea, p, opts) {
+    var neg = opts && opts.negatifs;
+    var o = alea.choix(OBJETS.filter(function (x) { return neg || x.e > 0; }));
     var exposants = [o.e];
-    var decalages = alea.melanger([-6, -3, 3, 6, -4, 4]);
-    for (var i = 0; exposants.length < 4; i++) exposants.push(o.e + decalages[i]);
+    var decalages = alea.melanger([-6, -3, 3, 6, -4, 4].filter(function (k) { return neg || o.e + k > 0; }));
+    for (var i = 0; exposants.length < 4 && i < decalages.length; i++) exposants.push(o.e + decalages[i]);
+    if (exposants.length < 4) exposants.push(o.e + 9);
     var choix = exposants.map(function (e) {
       return { h: m(pui(10, e) + ' ' + o.u), juste: e === o.e, cle: String(e), message: e === o.e ? '' : (e > o.e ? 'Beaucoup trop grand' : 'Beaucoup trop petit') + ' : ' + pui(10, e) + ' ' + o.u + ' = ' + (e >= 0 ? '1 suivi de ' + e + ' zéros.' : '0,' + Array(-e).join('0') + '1 ' + o.u + '.') };
     });
@@ -709,14 +802,16 @@
       etapes: O.etapes([['L\'ordre de grandeur de ' + o.q + ' est ' + m(pui(10, o.e) + ' ' + o.u) + '.', '']]),
       verification: 'Ces valeurs sont des ordres de grandeur (valeurs approchées).',
       rubrique: R.notationScientifique,
-      visuelCorrection: o.u === 'm' ? visuelPrefixes(null) : null,
+      visuelCorrection: o.u === 'm' ? visuelPrefixes(null, !neg) : null,
       controle: { type: 'aucun' }
     }, alea);
   }
 
-  function questionComparerSci(alea, p) {
-    var a = tirerNombreSci(alea, p), b = tirerNombreSci(alea, p);
+  function questionComparerSci(alea, p, opts) {
+    var neg = opts && opts.negatifs;
+    var a = tirerNombreSci(alea, p, neg), b = tirerNombreSci(alea, p, neg);
     if (alea.suivant() < 0.5) b = { mant: tirerNombreSci(alea, p).mant, e: a.e + alea.choix([-1, 1]), v: null };
+    if (!neg && b.e < 1) b.e = 1;
     b.v = b.mant.fois(fr(10).puissance(b.e));
     if (a.v.egal(b.v)) b = { mant: b.mant, e: b.e + 1, v: b.mant.fois(fr(10).puissance(b.e + 1)) };
     var s = a.v.compare(b.v);
@@ -745,8 +840,9 @@
 
   function questionRacine(alea, p, ctx) {
     var cubique = alea.suivant() < 0.4;
-    var k = alea.entier(cubique ? 1 : 2, cubique ? [0, 5, 6, 10, 10, 12][p] : [0, 10, 12, 15, 20, 25][p]);
-    var negatif = cubique && p >= 3 && alea.suivant() < 0.5;
+    // 10e : carrés parfaits ⩽ 225 (15²), cubes parfaits ⩽ 1000 (10³) ; racine cubique d'un négatif en D4
+    var k = alea.entier(cubique ? 1 : 2, cubique ? [0, 4, 5, 10, 10][p] : [0, 10, 15, 15, 15][p]);
+    var negatif = cubique && p >= 4 && alea.suivant() < 0.5;
     var n = cubique ? k * k * k : k * k;
     if (negatif) n = -n;
     var res = negatif ? -k : k;
@@ -777,7 +873,7 @@
     function (alea) { var k = alea.entier(2, 6); return { h: '∛(' + H.moins + (k * k * k) + ') = ' + H.moins + k, vrai: true, j: 'la racine cubique d\'un nombre négatif existe : (– ' + k + ')³ = – ' + (k * k * k) + '.' }; },
     function (alea) { var c = alea.choix([[9, 16], [36, 64], [25, 144], [16, 9], [4, 9], [36, 49]]); var s = Math.sqrt(c[0] + c[1]); return { h: '√' + c[0] + ' + √' + c[1] + ' = √' + (c[0] + c[1]), vrai: false, j: '√' + c[0] + ' + √' + c[1] + ' = ' + Math.sqrt(c[0]) + ' + ' + Math.sqrt(c[1]) + ' = ' + (Math.sqrt(c[0]) + Math.sqrt(c[1])) + (Number.isInteger(s) ? ', alors que √' + (c[0] + c[1]) + ' = ' + s : ', alors que √' + (c[0] + c[1]) + ' n\'est même pas un entier (' + (Math.floor(s)) + ' &lt; √' + (c[0] + c[1]) + ' &lt; ' + (Math.floor(s) + 1) + ')') + ' : √a + √b ≠ √(a + b).' }; },
     function (alea) { var a = alea.choix([4, 9, 16, 25]), b = alea.choix([4, 9, 16, 25, 36]); return { h: '√(' + a + ' · ' + b + ') = √' + a + ' · √' + b, vrai: true, j: '√(' + a + ' · ' + b + ') = √' + (a * b) + ' = ' + Math.sqrt(a * b) + ' et √' + a + ' · √' + b + ' = ' + Math.sqrt(a) + ' · ' + Math.sqrt(b) + ' = ' + (Math.sqrt(a) * Math.sqrt(b)) + '.' }; },
-    function (alea) { var k = alea.entier(2, 9); return { h: '(√' + k + ')² = ' + k, vrai: true, j: 'par définition, le carré de √' + k + ' vaut ' + k + '.' }; }
+    function (alea) { var r = alea.entier(2, 12), k = r * r; return { h: '(√' + k + ')² = ' + k, vrai: true, j: 'par définition, le carré de √' + k + ' vaut ' + k + ' (√' + k + ' = ' + r + ' et ' + r + '² = ' + k + ').' }; }
   ];
 
   function vraiFauxRacine(alea, p) {
@@ -802,8 +898,14 @@
    * 10e : propriétés des puissances (N2 : évalué ; N1 : « Pour aller plus loin »)
    * ===================================================================== */
 
-  function questionPropriete(alea, p) {
-    var genre = alea.choix(p <= 2 ? ['produit', 'quotient', 'puissance'] : ['produit', 'quotient', 'puissance', 'produitBases', 'negatif']);
+  /**
+   * Propriétés des puissances. D1 : produit de même base ; D2 : + quotient, puissance d'une puissance ;
+   * D3 : + même exposant (2³ · 5³) ; D4 : + exposants négatifs (si opts.negatifs).
+   */
+  function questionPropriete(alea, p, opts) {
+    var genres = [['produit'], ['produit', 'quotient', 'puissance'], ['produit', 'quotient', 'puissance', 'produitBases'], ['produit', 'quotient', 'puissance', 'produitBases']][p - 1];
+    if (opts && opts.negatifs && p >= 4) genres = genres.concat(['negatif', 'negatif']);
+    var genre = alea.choix(genres);
     var base = p >= 3 && alea.suivant() < 0.4 ? alea.choix(['a', 'x']) : alea.choix([2, 3, 5, 7, 10]);
     var m1 = alea.entier(2, 7), n1 = alea.entier(2, 6);
     var h, exp, et, pieges, baseRep = base, b1 = 0, b2 = 0;
@@ -852,20 +954,20 @@
       verification: typeof baseRep === 'string' || Math.abs(exp) > 6 ? 'Vérification : compte les facteurs ' + baseRep + ' (ou applique la propriété dans l\'autre sens).' : 'Vérification : ' + m(h + ' = ' + H.n(valeur)) + ' et ' + m(pui(baseRep, exp) + ' = ' + H.n(valeur)) + '. ✓',
       rubrique: R.proprietesPuissances,
       nombres: [fr(m1), fr(n1)],
-      controle: { expr: genre === 'puissance' ? '(' + txtB(base) + '^(' + m1 + '))^(' + n1 + ')' : genre === 'produitBases' ? b1 + '^' + n1 + '*' + b2 + '^' + n1 : txtB(base) + '^(' + m1 + ')' + (genre === 'quotient' ? ':' : '*') + txtB(base) + '^(' + n1 + ')' }
+      controle: { expr: genre === 'puissance' ? '(' + txtB(base) + '^(' + m1 + '))^(' + n1 + ')' : genre === 'produitBases' ? b1 + '^' + n1 + '*' + b2 + '^' + n1 : txtB(base) + '^(' + m1 + ')' + (genre === 'quotient' ? ':' : '*') + txtB(base) + '^(' + n1 + ')', mesure: { ops: 1, etapes: 1 } }
     });
   }
 
-  function vraiFauxProprietes(alea, p) {
+  function vraiFauxProprietes(alea, p, opts) {
     var b = alea.choix([2, 3, 5]), m1 = alea.entier(2, 4), n1 = alea.entier(2, 4);
     var cas = alea.choix([
       { h: pui(b, m1) + ' + ' + pui(b, n1) + ' = ' + pui(b, m1 + n1), a: b + '^' + m1 + '+' + b + '^' + n1, b2: b + '^' + (m1 + n1), j: 'on additionne les exposants pour un PRODUIT de puissances de même base, pas pour une somme : ' + pui(b, m1) + ' + ' + pui(b, n1) + ' = ' + H.n(fr(b).puissance(m1).plus(fr(b).puissance(n1))) + ' et ' + pui(b, m1 + n1) + ' = ' + H.n(fr(b).puissance(m1 + n1)) + '.' },
       { h: pui(b, m1) + ' · ' + pui(b, n1) + ' = ' + pui(b, m1 + n1), a: b + '^' + m1 + '*' + b + '^' + n1, b2: b + '^' + (m1 + n1), j: 'produit de puissances de même base : on additionne les exposants.' },
       { h: '(' + pui(b, m1) + ')' + sup(n1) + ' = ' + pui(b, m1 + n1), a: '(' + b + '^' + m1 + ')^' + n1, b2: b + '^' + (m1 + n1), j: 'pour une puissance de puissance, on multiplie les exposants : (' + pui(b, m1) + ')' + sup(n1) + ' = ' + pui(b, m1 * n1) + '.' },
-      { h: pui(b, m1) + ' · ' + pui(b, -m1) + ' = 1', a: b + '^' + m1 + '*' + b + '^(-' + m1 + ')', b2: '1', j: pui(b, m1) + ' et ' + pui(b, -m1) + ' sont des nombres inverses : leur produit vaut 1.' },
+      opts && opts.negatifs ? { h: pui(b, m1) + ' · ' + pui(b, -m1) + ' = 1', a: b + '^' + m1 + '*' + b + '^(-' + m1 + ')', b2: '1', j: pui(b, m1) + ' et ' + pui(b, -m1) + ' sont des nombres inverses : leur produit vaut 1.' } : null,
       { h: pui(b, m1) + ' · ' + pui(b, n1) + ' = ' + pui(b * b, m1 + n1), a: b + '^' + m1 + '*' + b + '^' + n1, b2: (b * b) + '^' + (m1 + n1), j: 'on garde la base : ' + pui(b, m1) + ' · ' + pui(b, n1) + ' = ' + pui(b, m1 + n1) + '.' },
       { h: pui(2, n1) + ' · ' + pui(5, n1) + ' = ' + pui(10, n1), a: '2^' + n1 + '*5^' + n1, b2: '10^' + n1, j: 'même exposant : on multiplie les bases, 2 · 5 = 10.' }
-    ]);
+    ].filter(Boolean));
     var vrai = M.evaluer(cas.a).egal(M.evaluer(cas.b2));
     if (vrai && cas.h.indexOf(' + ') > 0) vrai = true;
     return O.vraiFaux({
@@ -881,7 +983,7 @@
       etapes: O.etapes([[(vrai ? 'Vrai : ' : 'Faux : ') + cas.j, '']]),
       rubrique: R.proprietesPuissances,
       nombres: [fr(b), fr(m1), fr(n1)],
-      controle: { type: 'vf', a: cas.a, b: cas.b2, relation: '=' }
+      controle: { type: 'vf', a: cas.a, b: cas.b2, relation: '=', mesure: { ops: 1, etapes: 1 } }
     }, alea);
   }
 
@@ -908,7 +1010,7 @@
       etapes: O.etapes([['Produit de puissances de même base : on garde la base et on additionne les exposants.', m(pui(b, m1) + ' · ' + pui(b, n1) + ' = ' + pui(b, m1 + n1))]]),
       rubrique: R.proprietesPuissances,
       nombres: [fr(b), fr(m1), fr(n1)],
-      controle: { type: 'erreur', correct: b + '^' + m1 + '*' + b + '^' + n1, eleve: eleve, cle: cle }
+      controle: { type: 'erreur', correct: b + '^' + m1 + '*' + b + '^' + n1, eleve: eleve, cle: cle, mesure: { ops: 1, etapes: 1 } }
     }, alea);
   }
 
@@ -916,21 +1018,21 @@
    * 11e : inverse, opposé, racines de rationnels
    * ===================================================================== */
 
+  /** √(9/16), √0,49, ∛(– 8/27) : D1 petits carrés (dénominateur ⩽ 9) ; la taille augmente avec la difficulté. */
   function questionRacineRationnel(alea, p) {
-    var genre = alea.choix(['fraction', 'decimal', 'cubique']);
+    var genre = alea.choix(p <= 1 ? ['fraction', 'decimal'] : ['fraction', 'decimal', 'cubique']);
     var res, rad, rh, signe = '√';
     if (genre === 'fraction') {
-      var a = alea.entier(1, 9), b = alea.entier(2, 12);
+      var a = alea.entier(1, [0, 3, 9, 9, 12][p]), b = alea.entier(2, [0, 3, 9, 12, 12][p]);
       if (O.pgcd(a, b) !== 1) a = 1;
       res = fr(a, b); rad = res.puissance(2); rh = '(' + H.f(rad) + ')';
     } else if (genre === 'decimal') {
-      var k = alea.entier(1, 12);
+      var k = alea.entier(1, p <= 2 ? 9 : 12);
       res = fr(k, 10); if (k % 10 === 0) res = fr(11, 10);
-      if (alea.suivant() < 0.3) res = fr(alea.entier(1, 9), 100);
       rad = res.puissance(2); rh = H.n(rad);
     } else {
       signe = '∛';
-      var c = alea.entier(1, 5), d = alea.entier(2, 5);
+      var c = alea.entier(1, p <= 2 ? 2 : 5), d = alea.entier(2, p <= 2 ? 3 : 5);
       if (O.pgcd(c, d) !== 1) c = 1;
       res = fr(c, d); if (alea.suivant() < 0.5) res = res.oppose();
       rad = res.puissance(3); rh = '(' + H.f(rad) + ')';
@@ -1000,7 +1102,9 @@
       verification: 'Vérification : le nombre devant la puissance de 10 est compris entre 1 et 10. ✓',
       rubrique: R.notationScientifique,
       nombres: [ma, mb, fr(ea), fr(eb)],
-      controle: { expr: '(' + a + '*10^(' + ea + '))' + (op === '·' ? '*' : ':') + '(' + b + '*10^(' + eb + '))' }
+      // l'élève multiplie (ou divise) les nombres et additionne (ou soustrait) les exposants, puis écrit le résultat
+      controle: { expr: '(' + a + '*10^(' + ea + '))' + (op === '·' ? '*' : ':') + '(' + b + '*10^(' + eb + '))', mesure: { ops: 2, etapes: 2 } },
+      signature: op === '·' ? 'sciprod:' + [a + 'e' + ea, b + 'e' + eb].sort().join('*') : 'scidiv:' + a + 'e' + ea + ':' + b + 'e' + eb
     });
   }
 
@@ -1032,7 +1136,7 @@
       etapes: O.etapes([['Je multiplie les nombres et j\'additionne les exposants.', m(H.n(pr) + ' · 10' + sup(ea + eb))], ['J\'écris en notation scientifique.', m('= ' + H.sci(vraie))]]),
       rubrique: R.notationScientifique,
       nombres: [fr(a), fr(b), fr(ea), fr(eb)],
-      controle: { type: 'erreur', correct: '(' + a + '*10^(' + ea + '))*(' + b + '*10^(' + eb + '))', eleve: eleve, cle: cle, formeSeulement: formeSeulement }
+      controle: { type: 'erreur', correct: '(' + a + '*10^(' + ea + '))*(' + b + '*10^(' + eb + '))', eleve: eleve, cle: cle, formeSeulement: formeSeulement, mesure: { ops: 2, etapes: 2 } }
     }, alea);
   }
 
@@ -1055,7 +1159,7 @@
         verification: 'Vérification : ' + H.n(t) + ' s ' + (t.compare(100) > 0 ? '≈ ' + H.arrondi(t.divise(60), 1) + ' minutes' : '≈ ' + H.arrondi(t, 1) + ' secondes') + ', c\'est l\'ordre de grandeur connu. ✓',
         rubrique: R.notationScientifique,
         nombres: [d[0], fr(d[1])],
-        controle: { expr: '(' + d[0].toString() + '*10^' + d[1] + ')/(3*10^5)' }
+        controle: { expr: '(' + d[0].toString() + '*10^' + d[1] + ')/(3*10^5)', mesure: { ops: 2, etapes: 2 } }
       });
     }
     if (modele === 'serveur') {
@@ -1075,7 +1179,7 @@
         etapes: O.etapes([['Je convertis en Go.', m(H.n(cap) + ' To = ' + H.n(cap) + ' · 10³ Go = ' + H.n(cap.fois(1000)) + ' Go')], ['Je divise.', m(H.n(cap.fois(1000)) + ' : ' + H.n(video) + ' = ' + H.n(n))]]),
         rubrique: R.notationScientifique,
         nombres: [cap, video],
-        controle: { expr: '(' + cap.toString() + ')*1000/(' + video.toString() + ')' }
+        controle: { expr: '(' + cap.toString() + ')*1000/(' + video.toString() + ')', mesure: { ops: 2, etapes: 2 } }
       });
     }
     var taille = alea.choix([8, 5, 4, 2]); // µm
@@ -1094,7 +1198,7 @@
       rubrique: R.notationScientifique,
       visuel: visuelPrefixes(null),
       nombres: [fr(taille), fr(longueur)],
-      controle: { expr: '(' + longueur + '*10^(-2))/(' + taille + '*10^(-6))' }
+      controle: { expr: '(' + longueur + '*10^(-2))/(' + taille + '*10^(-6))', mesure: { ops: 3, etapes: 2 } }
     });
   }
 
@@ -1163,9 +1267,10 @@
    * ===================================================================== */
 
   function questionRacineN(alea, p) {
-    var cas = alea.choix([[2, 4], [3, 4], [2, 5], [3, 5], [2, 6], [5, 4], [2, 7], [2, 8], [10, 4], [10, 5], [10, 6], [4, 4]]);
+    // D1-D2 : ⁴√16, ⁴√81, ⁵√32, ⁶√64 ; D3 : + ⁵√243, ⁴√256, ⁴√625, ⁷√128 ; D4 : + racines d'indice impair de nombres négatifs
+    var cas = alea.choix(p <= 2 ? [[2, 4], [3, 4], [2, 5], [2, 6]] : [[2, 4], [3, 4], [2, 5], [3, 5], [2, 6], [5, 4], [2, 7], [4, 4]]);
     var b = cas[0], n = cas[1];
-    var neg = n % 2 === 1 && alea.suivant() < 0.4;
+    var neg = p >= 4 && n % 2 === 1 && alea.suivant() < 0.4;
     var rad = Math.pow(b, n) * (neg ? -1 : 1);
     var res = neg ? -b : b;
     var rh = (neg ? '(' + H.moins + H.n(fr(-rad)) + ')' : H.n(fr(rad)));
@@ -1210,9 +1315,10 @@
 
   var SANS_CARRE = [2, 3, 5, 6, 7, 10, 11, 13, 14, 15];
 
+  /** √50 = 5√2. Radicande ⩽ 100 (D1), 200 (D2), 300 (D3-D4). */
   function questionExtraire(alea, p) {
-    var k = alea.entier(2, p >= 4 ? 10 : 6), r = alea.choix(SANS_CARRE.slice(0, p >= 4 ? 10 : 6));
-    var n = k * k * r;
+    var k, r, n, essai = 0, lim = [0, 100, 200, 300, 300][p];
+    do { k = alea.entier(2, 10); r = alea.choix(SANS_CARRE); n = k * k * r; essai++; } while ((n > lim || (p >= 3 && n < 50)) && essai < 200);
     var gc = O.plusGrandCarre(n);
     return O.saisie({
       type: 'directe',
@@ -1226,19 +1332,26 @@
       verification: 'Vérification : ' + m('(' + k + '√' + r + ')² = ' + (k * k) + ' · ' + r + ' = ' + n) + '. ✓',
       rubrique: R.racines,
       nombres: [fr(n)],
-      controle: { expr: '√(' + n + ')' }
+      controle: { expr: '√(' + n + ')' },
+      signature: 'extr:' + n
     });
   }
 
   function questionProduitRacines(alea, p) {
-    var k = alea.entier(2, 8), r = alea.choix([2, 3, 5, 6, 7]);
-    var a = r * alea.choix([1, 4, 9]);
-    var c = k * k * r * r / a;
-    if (!Number.isInteger(c)) { a = r; c = k * k * r; }
+    // a = r · s², c = r · t² : a · c est un carré parfait ; nombres sous la limite
+    var a, c, k, r, essai = 0, lim = [0, 20, 100, 200, 300][p];
+    do {
+      r = alea.choix([2, 3, 5, 6, 7]);
+      var s1 = alea.entier(1, 3), t1 = alea.entier(1, 5);
+      if (s1 === t1) t1++;
+      a = r * s1 * s1; c = r * t1 * t1; k = s1 * t1;
+      essai++;
+    } while ((a > lim || c > lim) && essai < 200);
     var op = alea.choix(['·', ':']);
+    if (op === ':' && t1 % s1 !== 0) op = '·';
     var res, h;
     if (op === '·') { res = Math.sqrt(a * c); h = '√' + a + ' · √' + c; }
-    else { var big = a * k * k; res = k; h = '√' + big + ' : √' + a; c = big; }
+    else { res = Math.sqrt(c / a); h = '√' + c + ' : √' + a; }
     return O.saisie({
       type: 'directe',
       enonce: '<p>Calcule :</p><p class="calcul">' + m(h) + '</p>',
@@ -1250,13 +1363,14 @@
       verification: 'Vérification : ' + m(res + '² = ' + (res * res)) + '. ✓',
       rubrique: R.racines,
       nombres: [fr(a), fr(c)],
-      controle: { expr: op === '·' ? '√' + a + '*√' + c : '√' + c + ':√' + a }
+      // propriété √a · √b = √(a · b) puis racine d'un carré parfait : deux étapes
+      controle: { expr: op === '·' ? '√' + a + '*√' + c : '√' + c + ':√' + a, mesure: { ops: 2, etapes: 2 } }
     });
   }
 
   function questionSommeRacines(alea, p) {
     var r = alea.choix([2, 3, 5, 6, 7]);
-    var genre = p >= 4 && alea.suivant() < 0.6 ? 'extraire' : 'simple';
+    var genre = p >= 3 && alea.suivant() < 0.6 ? 'extraire' : 'simple';
     var coefs, h, res, et, pieges;
     if (genre === 'simple') {
       coefs = [alea.entier(1, 9), alea.entierNonNul(-8, 9), alea.entierNonNul(-8, 6)];
@@ -1289,17 +1403,19 @@
       verification: 'Vérification avec des valeurs approchées : les deux écritures valent environ ' + H.arrondi(M.Fraction.depuis(Number((res * Math.sqrt(r)).toFixed(6))), 2) + '. ✓',
       rubrique: R.racines,
       nombres: [fr(r)],
-      controle: { expr: h.replace(/–/g, '-').replace(/\s/g, '').replace(/(\d)√/g, '$1*√') }
+      controle: { expr: h.replace(/–/g, '-').replace(/\s/g, '').replace(/(\d)√/g, '$1*√'), mesure: genre === 'simple' ? { ops: 2, etapes: 2 } : { ops: 3, etapes: 2 } }
     });
   }
 
-  function vraiFauxRacinesProp(alea, p) {
+  /** opts.extraction : seulement l'extraction (11e N1) ; sinon aussi sommes et produits de racines (N2). */
+  function vraiFauxRacinesProp(alea, p, opts) {
+    var extraction = !!(opts && opts.extraction);
     var cas = alea.choix([
       function () { var a = alea.choix([9, 16, 36]), b = alea.choix([16, 64, 144]); return { h: '√' + a + ' + √' + b + ' = √' + (a + b), a: '√' + a + '+√' + b, b: '√' + (a + b) }; },
       function () { var a = alea.choix([2, 3, 5]), k = alea.entier(2, 4); return { h: '√' + a + ' · √' + (a * k * k) + ' = ' + (a * k), a: '√' + a + '*√' + (a * k * k), b: String(a * k) }; },
       function () { var k = alea.entier(2, 5), r = alea.choix([2, 3]); return { h: '√' + (k * k * r) + ' = ' + (k * k) + '√' + r, a: '√' + (k * k * r), b: (k * k) + '*√' + r }; },
       function () { var k = alea.entier(2, 5), r = alea.choix([2, 3, 5]); return { h: '√' + (k * k * r) + ' = ' + k + '√' + r, a: '√' + (k * k * r), b: k + '*√' + r }; }
-    ])();
+    ].slice(extraction ? 2 : 0))();
     var va = M.evaluerApproche(cas.a), vb = M.evaluerApproche(cas.b);
     var vrai = Math.abs(va - vb) < 1e-9;
     function aff(v) { var r = Math.round(v); return Math.abs(v - r) < 1e-9 ? '= ' + H.n(fr(r)) : '≈ ' + H.arrondi(M.Fraction.depuis(Number(v.toFixed(6))), 3); }
@@ -1317,19 +1433,93 @@
       indice: 'Compare des valeurs approchées des deux membres.',
       etapes: O.etapes([['Je compare des valeurs approchées.', just]]),
       rubrique: R.racines,
-      controle: { type: 'vf', a: cas.a, b: cas.b, relation: '=' }
+      controle: { type: 'vf', a: cas.a, b: cas.b, relation: '=', mesure: { ops: 1, etapes: 1 } }
     }, alea);
+  }
+
+  /* =====================================================================
+   * 10e niveau 2 (D4) : somme de deux nombres en notation scientifique
+   * ===================================================================== */
+
+  function questionSommeSci(alea, p) {
+    var a = alea.entier(1, 8), b = alea.entier(1, 9), e = alea.entier(3, 8);
+    var op = alea.choix(['+', '–']);
+    var total = op === '+' ? fr(a).fois(fr(10).puissance(e)).plus(fr(b).fois(fr(10).puissance(e - 1))) : fr(a + 1).fois(fr(10).puissance(e)).moins(fr(b).fois(fr(10).puissance(e - 1)));
+    var aa = op === '+' ? a : a + 1;
+    var ha = H.sciME(fr(aa), e), hb = H.sciME(fr(b), e - 1);
+    var bDec = fr(b, 10);
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Calcule et donne le résultat en notation scientifique :</p><p class="calcul">' + m(ha + ' ' + op + ' ' + hb) + '</p>',
+      consigne: 'Forme exigée : <strong>notation scientifique</strong> a · 10ⁿ avec 1 ⩽ a &lt; 10.',
+      clavier: 'complet',
+      indice: 'Pour additionner, il faut la même puissance de 10 : ' + M.formaterNombre(fr(b)) + ' · 10' + sup(e - 1) + ' = ' + M.formaterNombre(bDec) + ' · 10' + sup(e) + '.',
+      reponse: { type: 'valeur', valeur: total, forme: 'scientifique' },
+      pieges: [{ valeur: fr(op === '+' ? aa + b : aa - b).fois(fr(10).puissance(e)), message: 'Les deux nombres n\'ont pas la même puissance de 10 : on ne peut pas additionner directement ' + aa + ' et ' + b + '.' },
+        { valeur: fr(op === '+' ? aa + b : aa - b).fois(fr(10).puissance(2 * e - 1)), message: 'Pour une somme, on n\'additionne pas les exposants : on écrit d\'abord les deux nombres avec la même puissance de 10.' }],
+      etapes: O.etapes([
+        ['J\'écris les deux nombres avec la même puissance de 10.', m(hb + ' = ' + H.n(bDec) + ' · 10' + sup(e))],
+        ['J\'additionne (ou je soustrais) les nombres devant la puissance de 10.', m(ha + ' ' + op + ' ' + H.n(bDec) + ' · 10' + sup(e) + ' = ' + H.sci(total))]
+      ]),
+      verification: 'Vérification : ' + H.n(fr(aa).fois(fr(10).puissance(e))) + ' ' + op + ' ' + H.n(fr(b).fois(fr(10).puissance(e - 1))) + ' = ' + H.n(total) + '. ✓',
+      rubrique: R.notationScientifique,
+      nombres: [fr(aa), fr(b), fr(e)],
+      controle: { expr: '(' + aa + '*10^' + e + ')' + (op === '+' ? '+' : '-') + '(' + b + '*10^' + (e - 1) + ')', mesure: { ops: 2, etapes: 2 } }
+    });
+  }
+
+  /* =====================================================================
+   * 11e niveau 2 (D4) : calcul combinant produits de racines et racine n-ième
+   * ===================================================================== */
+
+  var RACINES_N = [[4, 16, 2], [4, 81, 3], [5, 32, 2], [3, 27, 3], [3, 64, 4], [6, 64, 2], [3, 125, 5]];
+
+  function questionCalculRacines(alea, p) {
+    var r = alea.choix([2, 3, 5, 6]);
+    var s1 = alea.entier(1, 2), t1 = alea.entier(2, 4);
+    if (s1 === t1) t1++;
+    var a = r * s1 * s1, b = r * t1 * t1;
+    if (alea.suivant() < 0.5) { var tmp = a; a = b; b = tmp; }
+    var k = Math.sqrt(a * b);
+    var rn = alea.choix(RACINES_N);
+    var op = alea.choix(['+', '–']);
+    var res = op === '+' ? k + rn[2] : k - rn[2];
+    var hRn = rn[0] === 3 ? '∛' + rn[1] : '<sup>' + rn[0] + '</sup>√' + rn[1];
+    var h = '√' + a + ' · √' + b + ' ' + op + ' ' + hRn;
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Calcule :</p><p class="calcul">' + m(h) + '</p>',
+      consigne: 'Écris un nombre entier.',
+      indice: '√a · √b = √(a · b). Pour ' + (rn[0] === 3 ? '∛' : rn[0] + 'e racine de ') + rn[1] + ', cherche le nombre dont la puissance ' + rn[0] + ' vaut ' + rn[1] + '.',
+      reponse: { type: 'valeur', valeur: fr(res), forme: 'entier' },
+      pieges: [{ valeur: fr(a * b + (op === '+' ? rn[2] : -rn[2])), message: 'N\'oublie pas la racine : √' + a + ' · √' + b + ' = √' + (a * b) + ' = ' + k + '.' },
+        { valeur: op === '+' ? fr(k).plus(fr(rn[1], rn[0])) : fr(k).moins(fr(rn[1], rn[0])), message: 'Prendre une racine n\'est pas diviser par l\'indice.' }],
+      etapes: O.etapes([
+        ['Produit de racines : √a · √b = √(a · b).', m('√' + a + ' · √' + b + ' = √' + (a * b) + ' = ' + k)],
+        ['Racine ' + (rn[0] === 3 ? 'cubique' : 'd\'indice ' + rn[0]) + ' : je cherche le nombre dont la puissance ' + rn[0] + ' vaut ' + rn[1] + '.', m(rn[2] + sup(rn[0]) + ' = ' + rn[1] + ', donc ' + hRn + ' = ' + rn[2])],
+        ['Je termine le calcul.', m(k + ' ' + op + ' ' + rn[2] + ' = ' + H.n(fr(res)))]
+      ]),
+      verification: 'Vérification : ' + m(k + '² = ' + (a * b)) + ' et ' + m(rn[2] + sup(rn[0]) + ' = ' + rn[1]) + '. ✓',
+      rubrique: R.racines,
+      nombres: [fr(a), fr(b), fr(rn[1])],
+      controle: { type: 'comboRacines', a: a, b: b, n: rn[0], c: rn[1], op: op, res: res, mesure: { ops: 4, etapes: 3 } },
+      signature: 'racop:' + [String(a), String(b)].sort().join('*') + (op === '+' ? '+' : '-') + 'r' + rn[0] + ':' + rn[1]
+    });
   }
 
   /* =====================================================================
    * Catalogue
    * ===================================================================== */
 
+  // Les objectifs de priorités ont deux opérations dès D1 (une seule opération ne permet pas
+  // de travailler les priorités ; choix validé par l'enseignante).
+  var BORNES_PRIORITES = { operations: [2, 3, 4, 4], etapes: [2, 2, 3, 3] };
+  function neg(c, p) { return expNeg(c, p); }
+
   var objectifs = [
     {
       id: 'B9-puissances', module: 'B', annee: 9, niveaux: [1, 2], theme: 'NO 9.1',
       titre: 'Notion de puissance ; calculer la puissance d\'un nombre naturel',
-      bornes: { max: [12, 12, 12, 12, 12], den: [1, 1, 1, 1, 1] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionCalculerPuissance(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionEcrirePuissance(a, p); } },
@@ -1339,8 +1529,9 @@
     },
     {
       id: 'B9-carres', module: 'B', annee: 9, niveaux: [1, 2], theme: 'NO 9.1',
-      titre: 'Carrés parfaits et cubes parfaits',
-      bornes: { max: [1800, 1800, 1800, 1800, 1800], den: [1, 1, 1, 1, 1] },
+      titre: 'Carrés parfaits (jusqu\'à 144) et cubes parfaits (jusqu\'à 125)',
+      // un carré parfait jusqu'à 144 et un cube jusqu'à 125 sont les nombres mêmes de l'objectif
+      bornesD: { nombre: [64, 100, 144, 144] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionTrouverCarre(a, p); } },
         { type: 'vraifaux', gen: function (a, p) { return vraiFauxCarreCube(a, p); } },
@@ -1350,60 +1541,62 @@
     {
       id: 'B9-priorites', module: 'B', annee: 9, niveaux: [1, 2], theme: 'NO 9.1',
       titre: 'Priorité des opérations avec des puissances',
-      bornes: { max: [100, 100, 100, 100, 100], den: [1, 1, 1, 1, 1] },
+      bornesD: BORNES_PRIORITES,
       modeles: [
         { type: 'directe', gen: function (a, p, c) { return questionPrioritesPuissances(a, p, c); } },
         { type: 'directe', gen: function (a, p, c) { return questionPrioritesPuissances(a, p, c); } },
-        { type: 'erreur', gen: function (a, p) { return erreurPrioritesPuissances(a, p, false); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxSommeCarres(a, p); } }
+        { type: 'erreur', palierMin: 3, gen: function (a, p) { return erreurPrioritesPuissances(a, p, false); } },
+        { type: 'vraifaux', palierMin: 2, gen: function (a, p) { return vraiFauxSommeCarres(a, p); } }
       ]
     },
     {
       id: 'B10-ecritures', module: 'B', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
-      titre: 'Écritures d\'un nombre : puissance (exposant négatif), puissance de 10',
-      bornes: { max: [12, 12, 12, 12, 12], den: [1, 1, 1, 1, 1] },
+      titre: 'Écritures d\'un même nombre : puissance, racine, puissance de 10',
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionPuissance10(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionExposantNegatif(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionEcrituresEgales(a, p); } }
+        { type: 'directe', gen: function (a, p, c) { return questionPuissance10(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'directe', gen: function (a, p) { return questionEcrituresNombre(a, p); } },
+        { type: 'directe', si: function (c, p) { return neg(c, p); }, gen: function (a, p) { return questionExposantNegatif(a, p); } },
+        { type: 'directe', si: function (c, p) { return neg(c, p); }, gen: function (a, p) { return questionEcrituresEgales(a, p); } }
       ]
     },
     {
       id: 'B10-prefixes', module: 'B', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
       titre: 'Préfixes des puissances de 10 (kilo, méga, giga, téra ; milli, micro, nano)',
-      bornes: { max: [450, 450, 450, 450, 450], den: [10, 10, 10, 10, 10] },
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionPrefixePuissance(a, p); } },
-        { type: 'probleme', gen: function (a, p) { return questionConversionPrefixe(a, p); } },
-        { type: 'probleme', gen: function (a, p) { return problemePrefixes(a, p); } }
+        { type: 'directe', gen: function (a, p, c) { return questionPrefixePuissance(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'probleme', gen: function (a, p, c) { return questionConversionPrefixe(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'directe', si: function (c, p) { return !neg(c, p); }, gen: function (a, p) { return questionPrefixeDecimal(a, p); } },
+        { type: 'probleme', palierMin: 2, gen: function (a, p) { return problemePrefixes(a, p); } }
       ]
     },
     {
       id: 'B10-notation', module: 'B', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
       titre: 'Écrire et interpréter un nombre en notation scientifique',
-      bornes: { max: [100, 100, 100, 100, 100], den: [1000, 1000, 1000, 1000, 1000] },
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionEcrireSci(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionSciVersDecimal(a, p); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxSci(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionOrdreGrandeurSci(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionComparerSci(a, p); } }
+        { type: 'directe', gen: function (a, p, c) { return questionEcrireSci(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'directe', gen: function (a, p, c) { return questionSciVersDecimal(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'vraifaux', gen: function (a, p, c) { return vraiFauxSci(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'directe', palierMin: 2, gen: function (a, p, c) { return questionOrdreGrandeurSci(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'directe', palierMin: 2, gen: function (a, p, c) { return questionComparerSci(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'directe', si: function (c, p) { return c.niveau === 2 && p >= 4; }, gen: function (a, p) { return questionSommeSci(a, p); } },
+        { type: 'directe', si: function (c, p) { return c.niveau === 2 && p >= 4; }, gen: function (a, p) { return questionCalculSci(a, p); } }
       ]
     },
     {
       id: 'B10-priorites', module: 'B', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
-      titre: 'Priorité des opérations (puissances, racines, nombres relatifs)',
-      bornes: { max: [120, 120, 120, 120, 120], den: [1, 1, 1, 1, 1] },
+      titre: 'Priorité des opérations (puissances et racines)',
+      bornesD: BORNES_PRIORITES,
       modeles: [
-        { type: 'directe', gen: function (a, p, c) { return questionPrioritesPuissances(a, p, c, { relatifs: true, racines: true }); } },
-        { type: 'directe', gen: function (a, p, c) { return questionPrioritesPuissances(a, p, c, { relatifs: true, racines: true }); } },
-        { type: 'erreur', gen: function (a, p) { return erreurPrioritesPuissances(a, p, true); } }
+        { type: 'directe', gen: function (a, p, c) { return questionPrioritesPuissances(a, p, c, { relatifs: neg(c, p), racines: true }); } },
+        { type: 'directe', gen: function (a, p, c) { return questionPrioritesPuissances(a, p, c, { relatifs: neg(c, p), racines: true }); } },
+        { type: 'erreur', palierMin: 3, gen: function (a, p, c) { return erreurPrioritesPuissances(a, p, neg(c, p)); } }
       ]
     },
     {
       id: 'B10-racines', module: 'B', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
-      titre: 'Racine carrée d\'un carré parfait, racine cubique d\'un cube parfait',
-      bornes: { max: [1000, 1000, 1000, 1000, 1800], den: [1, 1, 1, 1, 1] },
+      titre: 'Racine carrée d\'un carré parfait (jusqu\'à 225), racine cubique d\'un cube parfait (jusqu\'à 1000)',
+      // le radicande est le nombre de l'objectif : 225 et 1000 sont les bornes fixées par l'enseignante
+      bornesD: { nombre: [100, 225, 1000, 1000] },
       modeles: [
         { type: 'directe', gen: function (a, p, c) { return questionRacine(a, p, c); } },
         { type: 'directe', gen: function (a, p, c) { return questionRacine(a, p, c); } },
@@ -1414,67 +1607,74 @@
       id: 'B10-proprietes', module: 'B', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
       plusLoinN1: [10],
       titre: 'Propriétés des puissances',
-      bornes: { max: [10, 10, 10, 10, 10], den: [1, 1, 1, 1, 1] },
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionPropriete(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionPropriete(a, p); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxProprietes(a, p); } },
-        { type: 'erreur', gen: function (a, p) { return erreurProprietes(a, p); } }
+        { type: 'directe', gen: function (a, p, c) { return questionPropriete(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'directe', gen: function (a, p, c) { return questionPropriete(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'vraifaux', gen: function (a, p, c) { return vraiFauxProprietes(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurProprietes(a, p); } }
       ]
     },
     {
       id: 'B10-problemes', module: 'B', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
       titre: 'Résoudre des problèmes (données numériques, puissances de 10)',
-      bornes: { max: [450, 450, 450, 450, 450], den: [10, 10, 10, 10, 10] },
       modeles: [
-        { type: 'probleme', gen: function (a, p) { return problemePrefixes(a, p); } },
-        { type: 'probleme', gen: function (a, p) { return questionConversionPrefixe(a, p); } }
+        { type: 'probleme', gen: function (a, p, c) { return questionConversionPrefixe(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'probleme', palierMin: 2, gen: function (a, p) { return problemePrefixes(a, p); } }
       ]
     },
     {
       id: 'B11-racines', module: 'B', annee: 11, niveaux: [1, 2], theme: 'NO 11.1',
-      titre: 'Inverse, opposé ; racine carrée et cubique de nombres rationnels',
-      bornes: { max: [150, 150, 150, 150, 150], den: [10000, 10000, 10000, 10000, 10000] },
+      titre: 'Inverse, opposé ; racines carrées et cubiques de nombres parfaits',
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionRacineRationnel(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionInversePuissance(a, p); } },
+        { type: 'directe', palierMin: 2, gen: function (a, p) { return questionInversePuissance(a, p); } },
         { type: 'vraifaux', gen: function (a, p) { return vraiFauxRacine(a, p); } }
       ]
     },
     {
-      id: 'B11-notation', module: 'B', annee: 11, niveaux: [1, 2], theme: 'NO 11.1',
-      titre: 'Propriétés des puissances et calculs en notation scientifique',
-      bornes: { max: [100, 100, 100, 100, 100], den: [1000, 1000, 1000, 1000, 1000] },
+      id: 'B11-extraction', module: 'B', annee: 11, niveaux: [1, 2], theme: 'NO 11.1',
+      titre: 'Simplifier une racine en extrayant un entier (√50 = 5√2)',
+      // le radicande (50, 72…) est le nombre à simplifier : jusqu'à 100 dès D1
+      bornesD: { nombre: [100, 200, 300, 300] },
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionCalculSci(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionPropriete(a, Math.min(5, p + 1)); } },
-        { type: 'erreur', gen: function (a, p) { return erreurSci(a, p); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxProprietes(a, p); } }
+        { type: 'directe', gen: function (a, p) { return questionExtraire(a, p); } },
+        { type: 'directe', gen: function (a, p) { return questionExtraire(a, p); } },
+        { type: 'vraifaux', gen: function (a, p) { return vraiFauxRacinesProp(a, p, { extraction: true }); } }
+      ]
+    },
+    {
+      id: 'B11-notation', module: 'B', annee: 11, niveaux: [1, 2], theme: 'NO 11.1',
+      titre: 'Propriétés des puissances (exposants entiers relatifs) et notation scientifique',
+      modeles: [
+        { type: 'directe', gen: function (a, p) { return questionPropriete(a, p, { negatifs: true }); } },
+        { type: 'directe', palierMin: 2, gen: function (a, p) { return questionCalculSci(a, p); } },
+        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurSci(a, p); } },
+        { type: 'vraifaux', gen: function (a, p) { return vraiFauxProprietes(a, p, { negatifs: true }); } }
       ]
     },
     {
       id: 'B11-reels', module: 'B', annee: 11, niveaux: [1, 2], theme: 'NO 11.1',
       titre: 'Comparer et ordonner des nombres réels (puissances, racines)',
-      bornes: { max: [100, 100, 100, 100, 100], den: [1000, 1000, 1000, 1000, 1000] },
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionOrdonnerPuissances(a, p); } },
+        { type: 'directe', palierMin: 2, gen: function (a, p) { return questionOrdonnerPuissances(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionComparerPuissances(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionComparerSci(a, p); } }
+        { type: 'directe', gen: function (a, p) { return questionComparerSci(a, p, { negatifs: true }); } }
       ]
     },
     {
       id: 'B11-problemes', module: 'B', annee: 11, niveaux: [1, 2], theme: 'NO 11.1',
       titre: 'Résoudre des problèmes avec des nombres réels (notation scientifique)',
-      bornes: { max: [10, 10, 10, 10, 10], den: [100, 100, 100, 100, 100] },
       modeles: [
-        { type: 'probleme', gen: function (a, p) { return problemeSci(a, p); } },
-        { type: 'probleme', gen: function (a, p) { return problemeSci(a, p); } }
+        { type: 'probleme', si: function (c, p) { return p <= 1; }, gen: function (a, p) { return questionConversionPrefixe(a, p, { negatifs: true }); } },
+        { type: 'probleme', palierMin: 2, gen: function (a, p) { return problemeSci(a, p); } },
+        { type: 'probleme', palierMin: 2, gen: function (a, p) { return problemeSci(a, p); } }
       ]
     },
     {
+      // À VÉRIFIER : la racine n-ième n'a pas été confirmée dans le livre de 11e.
       id: 'B11-racine-n', module: 'B', annee: 11, niveaux: [2], theme: 'NO 11.1',
-      titre: 'Racine n-ième',
-      bornes: { max: [100000000, 100000000, 100000000, 100000000, 100000000], den: [1, 1, 1, 1, 1] },
+      titre: 'Racine n-ième de nombres simples',
+      bornesD: { nombre: [100, 100, 1000, 1000] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionRacineN(a, p); } },
         { type: 'vraifaux', gen: function (a, p) { return vraiFauxRacineN(a, p); } }
@@ -1482,13 +1682,13 @@
     },
     {
       id: 'B11-racines-prop', module: 'B', annee: 11, niveaux: [2], theme: 'NO 11.1',
-      titre: 'Propriétés des racines, extraction d\'entiers (√50 = 5√2)',
-      bornes: { max: [2000, 2000, 2000, 2000, 2000], den: [1, 1, 1, 1, 1] },
+      titre: 'Opérations sur les racines (√a · √b, sommes de racines)',
+      bornesD: { nombre: [100, 200, 300, 300] },
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionExtraire(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionProduitRacines(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionSommeRacines(a, p); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxRacinesProp(a, p); } }
+        { type: 'vraifaux', gen: function (a, p) { return vraiFauxRacinesProp(a, p); } },
+        { type: 'directe', palierMin: 2, gen: function (a, p) { return questionProduitRacines(a, p); } },
+        { type: 'directe', palierMin: 2, gen: function (a, p) { return questionSommeRacines(a, p); } },
+        { type: 'directe', palierMin: 4, gen: function (a, p) { return questionCalculRacines(a, p); } }
       ]
     }
   ];

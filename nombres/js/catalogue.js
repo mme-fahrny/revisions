@@ -5,8 +5,10 @@
  *
  *   Nombres.MODULES                         A, B, C (titre, description)
  *   Nombres.objectifs                        tous les objectifs
- *   Nombres.palier(difficulte, niveau)       1 à 5 : difficulté du curseur (1 à 4),
- *                                            + 1 au niveau 2 (le niveau 2 va plus loin)
+ *   Nombres.palier(difficulte, niveau)       difficulté appliquée (1 à 4) : la même aux deux
+ *                                            niveaux ; le niveau 2 a du contenu en plus
+ *                                            (ctx.niveau dans les générateurs), jamais des
+ *                                            nombres plus grands.
  *   Nombres.objectifsPour(module, profil)    objectifs disponibles, avec leur statut :
  *        'courant'  : objectif de l'année de l'élève
  *        'revision' : objectif d'une année précédente
@@ -53,9 +55,24 @@
     visuel: 'Représentation'
   };
 
-  function palier(difficulte, niveau) {
-    var d = Math.max(1, Math.min(4, Number(difficulte) || 1));
-    return d + (Number(niveau) === 2 ? 1 : 0);
+  function palier(difficulte) {
+    return Math.max(1, Math.min(4, Number(difficulte) || 1));
+  }
+
+  /*
+   * Exemples de référence de l'enseignante : ils ne doivent jamais apparaître dans
+   * l'appli (le site est public). On ne garde ici que leur empreinte chiffrée
+   * (FNV-1a) ; les générateurs concernés posent q.signature, et une question dont
+   * l'empreinte figure dans la liste est tirée à nouveau.
+   */
+  var EMPREINTES_INTERDITES = ['r8dmbx', '1f16cfo', '1nadq2b', '13odsn1', 'qa3k7d', 'tbma66', '1np2vhh', 'ernp64'];
+  function empreinte(t) {
+    var x = 2166136261;
+    for (var i = 0; i < t.length; i++) { x ^= t.charCodeAt(i); x = Math.imul(x, 16777619); }
+    return (x >>> 0).toString(36);
+  }
+  function estInterdite(q) {
+    return !!q.signature && EMPREINTES_INTERDITES.indexOf(empreinte(q.signature)) >= 0;
   }
 
   /** L'objectif est-il « Pour aller plus loin » pour ce profil ? */
@@ -85,7 +102,9 @@
 
   /** Une question d'un objectif. typesUtilises : compteur pour varier les types. */
   function creerQuestion(o, alea, p, ctx, typesUtilises, strict) {
-    var modeles = o.modeles.filter(function (m) { return !m.palierMin || p >= m.palierMin; });
+    // modele.si(ctx, p) : modèle réservé à certaines difficultés ou à un niveau
+    var modeles = o.modeles.filter(function (m) { return (!m.palierMin || p >= m.palierMin) && (!m.si || m.si(ctx, p)); });
+    if (!modeles.length) modeles = o.modeles.filter(function (m) { return !m.si; });
     typesUtilises = typesUtilises || {};
     // on préfère les types les moins utilisés dans la série
     var min = Infinity;
@@ -96,6 +115,7 @@
     for (;;) {
       try {
         q = modele.gen(alea, p, ctx);
+        if (estInterdite(q)) { essais++; if (essais > 30) throw new Error('Exemple de référence impossible à éviter'); continue; }
         break;
       } catch (e) {
         essais++;
@@ -147,6 +167,7 @@
     objectifs: objectifs,
     parId: parId,
     palier: palier,
+    estInterdite: estInterdite,
     objectifsPour: objectifsPour,
     selectionParDefaut: selectionParDefaut,
     creerQuestion: creerQuestion,
