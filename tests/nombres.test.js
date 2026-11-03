@@ -5,6 +5,12 @@
  * Pour chaque module (A, B, C), chaque année (9e, 10e, 11e), chaque niveau (1, 2)
  * et chaque difficulté (1 à 4) : au moins 500 questions générées avec une graine fixe.
  * On vérifie :
+ *   - que chaque question respecte les bornes de sa difficulté (tailles, opérations, étapes) ;
+ *   - qu'aucune question de 9e ne contient de division de fractions, de puissance négative
+ *     ou de racine non parfaite (et pas d'écriture périodique ni de puissance en fractions) ;
+ *   - les règles par niveau (pas de négatifs en fractions en 10e N1, pas d'exposant négatif
+ *     en puissances 10e N1, pas d'intercalation entre réels en 11e N1…) ;
+ *   - qu'aucun exemple de référence de l'enseignante n'est reproduit (liste chiffrée) ;
  *   - que la réponse attendue est juste, recalculée par une méthode indépendante
  *     (texte de contrôle lu par Maths.analyser, calcul exact ET calcul en virgule flottante) ;
  *   - que les nombres restent dans les bornes prévues par l'objectif ;
@@ -271,14 +277,121 @@ function verifierReponses(q, ident) {
   }
 }
 
-function verifierBornes(q, o, ident) {
-  var b = o.bornes;
-  if (!b) { echec('bornes non définies', o.id); return; }
-  var max = b.max[q.palier - 1], den = b.den[q.palier - 1];
+/*
+ * Calibrage par difficulté (règles de l'enseignante) :
+ *   D1 : une opération, nombres ⩽ 20, dénominateurs ⩽ 12, résultat simple ;
+ *   D2 : deux étapes, nombres ⩽ 100 ;
+ *   D3 : deux à trois étapes, nombres ⩽ 200 ;
+ *   D4 : trois étapes au plus, nombres ⩽ 300, jamais plus de 4 opérations.
+ * « Opérations » et « étapes » sont mesurées sur le texte de contrôle de la question
+ * (arbre de calcul lu par Maths.analyser) : une étape = un niveau de l'arbre.
+ * Un objectif peut déclarer des bornes propres (bornesD) quand la règle générale
+ * n'a pas de sens (exemples : cubes jusqu'à 1000 en 10e, √50 dès D1 en 11e) ;
+ * chaque exception est justifiée dans le fichier de l'objectif.
+ */
+var BORNES_D = {
+  nombre: [20, 100, 200, 300],
+  den: [12, 100, 200, 300],
+  decimales: [2, 2, 3, 3],
+  operations: [1, 3, 4, 4],
+  etapes: [1, 2, 3, 3]
+};
+
+function litteralEntier(n) { if (n.type === 'neg') n = n.arg; return n.type === 'nombre' && n.valeur.estEntier(); }
+function estFractionLitterale(n) { if (n && n.type === 'neg') n = n.arg; return !!n && n.type === '/' && n.symbole === '/' && litteralEntier(n.g) && litteralEntier(n.d); }
+/** Nombre d'opérations et profondeur (étapes) d'un arbre ; « a/b » entre entiers est un nombre, pas une opération. */
+function mesurer(n) {
+  if (n.type === 'nombre' || n.type === 'lettre') return { ops: 0, etapes: 0 };
+  if (n.type === 'neg') return mesurer(n.arg);
+  if (estFractionLitterale(n)) return { ops: 0, etapes: 0 };
+  var enfants = n.type === '^' ? [n.base] : n.type === 'racine' ? [n.arg] : [n.g, n.d];
+  var m = enfants.map(mesurer);
+  return { ops: 1 + m.reduce(function (s, x) { return s + x.ops; }, 0), etapes: 1 + Math.max.apply(null, m.map(function (x) { return x.etapes; })) };
+}
+function textesControle(c) {
+  if (!c) return [];
+  return [c.expr, c.a, c.b, c.correct].concat(c.exprs || []).filter(function (t) { return typeof t === 'string' && !/^irr/.test(t); });
+}
+function borne(o, cle, d) {
+  var b = o.bornesD && o.bornesD[cle];
+  return b ? b[d - 1] : BORNES_D[cle][d - 1];
+}
+function nbDecimales(x) {
+  var y = x, k = 0;
+  while (!y.estEntier() && k < 12) { y = y.fois(10); k++; }
+  return y.estEntier() ? k : Infinity;
+}
+
+function verifierBornes(q, o, d, ident) {
+  var maxN = borne(o, 'nombre', d), maxDen = borne(o, 'den', d), maxDec = borne(o, 'decimales', d);
   q.nombres.forEach(function (x) {
-    verifierQue(x.abs().compare(max) <= 0, 'nombre hors bornes (taille)', ident + ' : ' + x + ' > ' + max);
-    verifierQue(Number(x.den) <= den, 'nombre hors bornes (dénominateur ou décimales)', ident + ' : ' + x + ' (dén. max ' + den + ')');
+    verifierQue(x.abs().compare(maxN) <= 0, 'nombre trop grand pour la difficulté', ident + ' : ' + x + ' > ' + maxN);
+    var okDecimal = nbDecimales(x) <= maxDec;
+    var okFraction = Number(x.den) <= maxDen && Math.abs(Number(x.num)) <= Math.max(maxN, Number(x.den));
+    verifierQue(okDecimal || okFraction, 'dénominateur ou décimales hors bornes', ident + ' : ' + x + ' (dén. ⩽ ' + maxDen + ', décimales ⩽ ' + maxDec + ')');
   });
+  var ops = 0, etapes = 0;
+  if (q.controle && q.controle.conversion) { ops = 1; etapes = 1; }
+  else textesControle(q.controle).forEach(function (t) {
+    var m;
+    try { m = mesurer(Maths.analyser(t)); } catch (e) { echec('texte de contrôle illisible', ident + ' ' + t); return; }
+    ops = Math.max(ops, m.ops); etapes = Math.max(etapes, m.etapes);
+  });
+  var maxOps = borne(o, 'operations', d), maxEt = borne(o, 'etapes', d);
+  verifierQue(ops <= maxOps, 'trop d\'opérations pour la difficulté', ident + ' : ' + ops + ' > ' + maxOps + ' ' + JSON.stringify(textesControle(q.controle)));
+  verifierQue(etapes <= maxEt, 'trop d\'étapes pour la difficulté', ident + ' : ' + etapes + ' > ' + maxEt + ' ' + JSON.stringify(textesControle(q.controle)));
+}
+
+/** Texte « visible » de la question (énoncé, consigne, options). */
+function htmlVisible(q) {
+  return [q.enonce, q.consigne].concat(q.choix ? q.choix.map(function (c) { return c.h; }) : []).join(' ');
+}
+var EXPOSANT_NEGATIF = /⁻|<sup>\s*[–-]/;
+var DIVISION_FRACTIONS = /<\/span><\/span>\)?\s*:\s*\(?(–\s)?<span class="frac"|<\/span><\/span>\)?\s*:|:\s*\(?(–\s)?<span class="frac"/;
+var SUPERSCRIPTS = /[⁰¹²³⁴⁵⁶⁷⁸⁹]|<sup>/;
+function racinesNonParfaites(h) {
+  var t = texteBrut(h).replace(/'/g, '');
+  var res = [], re = /(√|∛)\s*\(?\s*(–\s?)?(\d+(?:,\d+)?)/g, m;
+  while ((m = re.exec(t))) {
+    var k = m[1] === '∛' ? 3 : 2;
+    var v = Number(m[3].replace(',', '.'));
+    var r = Math.round(Math.pow(v, 1 / k));
+    if (Math.abs(Math.pow(r, k) - v) > 1e-9) res.push(m[0]);
+  }
+  return res;
+}
+
+/** Règles de contenu par année et par niveau. */
+function verifierContenu(q, o, profil, d, ident) {
+  var h = htmlVisible(q);
+  if (o.annee === 9) {
+    verifierQue(!DIVISION_FRACTIONS.test(h), '9e : division de fractions', ident);
+    verifierQue(!EXPOSANT_NEGATIF.test(h), '9e : puissance négative', ident);
+    verifierQue(racinesNonParfaites(h).length === 0, '9e : racine non parfaite', ident + ' ' + racinesNonParfaites(h).join(' '));
+    if (o.module === 'A') {
+      verifierQue(!/class="periode"/.test(h + (q.attenduHtml || '')), '9e (fractions) : écriture périodique', ident);
+      verifierQue(!SUPERSCRIPTS.test(h), '9e (fractions) : puissance', ident);
+    }
+  }
+  if (o.module === 'A' && o.annee === 10 && profil.niveau === 1 && o.id !== 'A10-oppose-inverse') {
+    verifierQue(q.nombres.every(function (x) { return x.signe() >= 0; }), '10e N1 (fractions) : nombre négatif', ident);
+  }
+  if (o.module === 'A' && o.annee === 11 && profil.niveau === 1) {
+    verifierQue(!(q.reponse.type === 'entre' && q.reponse.reels), '11e N1 : intercalation entre deux réels', ident);
+  }
+  if (o.module === 'B' && o.annee === 10 && profil.niveau === 1) {
+    verifierQue(!EXPOSANT_NEGATIF.test(h), '10e N1 (puissances) : exposant négatif', ident);
+  }
+  if (o.module === 'B' && o.annee === 10 && profil.niveau === 2 && d < 4 && o.id !== 'B10-proprietes') {
+    verifierQue(!EXPOSANT_NEGATIF.test(h), '10e N2 : exposant négatif avant D4', ident);
+  }
+  if (o.module === 'C' && profil.niveau === 1) {
+    verifierQue(!/\((–|-)\s?\d+\)[⁰¹²³⁴⁵⁶⁷⁸⁹]/.test(texteBrut(h)), 'relatifs N1 : puissance d\'un nombre négatif', ident);
+  }
+  if (o.module === 'C' && profil.niveau === 2 && d < 4) {
+    verifierQue(!/\((–|-)\s?\d+\)[⁰¹²³⁴⁵⁶⁷⁸⁹]/.test(texteBrut(h)) || o.id === 'C10-puissance', 'relatifs : puissance d\'un relatif mêlée aux calculs avant D4', ident);
+  }
+  verifierQue(!Nombres.estInterdite(q), 'exemple de référence reproduit', ident);
 }
 
 /** Droite numérique lisible : au moins deux nombres écrits, points dans la droite. */
@@ -353,14 +466,15 @@ modules.forEach(function (mod) {
           serie.forEach(function (q) {
             n++; total++;
             var o = Nombres.parId[q.objectif];
-            var ident = q.objectif + ' p' + q.palier + ' [' + graine + ' n°' + q.numero + ']';
+            var ident = q.objectif + ' ' + annee + 'e N' + niveau + ' D' + diff + ' [' + graine + ' n°' + q.numero + ']';
             parObjectif[q.objectif] = (parObjectif[q.objectif] || 0) + 1;
             verifierQue(o.annee <= annee && o.niveaux.indexOf(niveau) >= 0, 'question hors profil', ident);
-            verifierQue(q.palier === diff + (niveau === 2 ? 1 : 0), 'palier incorrect', ident);
+            verifierQue(q.palier === diff, 'difficulté incorrecte', ident);
             verifierQue(q.compte === !(niveau === 1 && (o.plusLoinN1 || []).indexOf(annee) >= 0), 'statut « pour aller plus loin » incorrect', ident);
             controler(q, ident);
             verifierReponses(q, ident);
-            verifierBornes(q, o, ident);
+            verifierBornes(q, o, diff, ident);
+            verifierContenu(q, o, profil, diff, ident);
             verifierEcriture(q, ident);
             verifierVisuels(q, ident);
           });
@@ -376,8 +490,12 @@ Nombres.objectifs.forEach(function (o) {
   verifierQue(parObjectif[o.id] > 0, 'objectif jamais généré', o.id);
 });
 
-// Règles de niveau : le niveau 2 atteint un palier que le niveau 1 n'atteint pas
-verifierQue(Nombres.palier(4, 1) === 4 && Nombres.palier(4, 2) === 5 && Nombres.palier(1, 1) === 1, 'paliers', '');
+// La difficulté choisie est la difficulté appliquée, au niveau 1 comme au niveau 2
+verifierQue(Nombres.palier(4, 1) === 4 && Nombres.palier(4, 2) === 4 && Nombres.palier(1, 2) === 1, 'difficulté', '');
+// Objectifs propres au niveau 2
+['A9-pourcentages', 'B11-racine-n', 'C10-puissance'].forEach(function (id) {
+  verifierQue(Nombres.parId[id] && Nombres.parId[id].niveaux.join() === '2', 'objectif censé être réservé au niveau 2', id);
+});
 // Objectifs réservés au niveau 2 : absents au niveau 1
 [9, 10, 11].forEach(function (annee) {
   Nombres.objectifsPour(null, { annee: annee, niveau: 1 }).forEach(function (d) {
