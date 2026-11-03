@@ -220,9 +220,6 @@ function controler(q, ident) {
         verifierQue(r.valeurs.length === 1, 'une seule solution attendue', ident);
         var vs = { x: r.valeurs[0] };
         verifierQue(Maths.evaluer(c.g, vs).egal(Maths.evaluer(c.d, vs)), 'la solution ne vérifie pas l\'équation', ident + ' ' + c.g + ' = ' + c.d);
-        if (q.palier <= 3 && /résous/i.test(texteBrut(q.enonce)) && q.objectif !== 'B11-res') {
-          verifierQue(F.depuis(r.valeurs[0]).estEntier(), 'solution non entière aux difficultés basses', ident + ' ' + c.g + ' = ' + c.d);
-        }
       }
       break;
     }
@@ -334,6 +331,176 @@ function controlerEcriture(q, ident) {
   verifierQue(!/\d\.\d/.test(sansMontants), 'point décimal au lieu de la virgule', ident + ' : ' + (sansMontants.match(/.{0,30}\d\.\d.{0,30}/) || [''])[0]);
   verifierQue(!/undefined|NaN|\[object/.test(t), 'texte mal construit', ident + ' : ' + (t.match(/.{0,40}(undefined|NaN|\[object).{0,40}/) || [''])[0]);
   verifierQue(!/aide-mémoire[^.]*page|p\.\s?\d/i.test(t), 'renvoi par numéro de page', ident);
+  verifierQue(!/Viète/.test(t), 'nom « formule de Viète » encore affiché (nomenclature provisoire : formule de résolution)', ident);
+}
+
+/* ---------- bornes de difficulté (calibrage de l'enseignante) ----------
+ * Mesures faites ici, sans le moteur de polynômes de l'appli :
+ *   - nombres écrits juste devant une lettre ou une parenthèse (coefficients) ;
+ *   - coefficient négatif devant une lettre ;
+ *   - nombre de termes écrits, profondeur des parenthèses ;
+ *   - étapes de résolution d'une équation du premier degré (calculées par substitution) ;
+ *   - nature de la solution (entière, décimale, fraction, S = { }, S = ℝ).
+ */
+var ETAPES_MAX = { 1: 2, 2: 3, 3: 4, 4: 5 };
+var TERMES_MAX = { 9: { 1: 2, 2: 3, 3: 4, 4: 4 }, 10: { 1: 3, 2: 4, 3: 5, 4: 6 } };
+// objectifs dont les nombres viennent d'un contexte (prix, longueurs…) : pas de borne sur les coefficients
+// et formes développées à factoriser (les coefficients y sont des produits)
+var CONTEXTE = /pb|geo|expr|sys|deg2|graph|form|preuve|fact|rem/;
+
+function sourcesDepart(q) {
+  var r = q.reponse, c = q.controle || {}, s = [];
+  if (r.depart) s.push(r.depart);
+  if (c.type === 'equation' || c.type === 'estSolution') s.push(c.g, c.d);
+  if (c.type === 'regle') s.push(c.e1[0], c.e1[1]);
+  if (c.type === 'lignesEq') s.push(c.lignes[0][0], c.lignes[0][1]);
+  return s;
+}
+function profondeur(src) {
+  var p = 0, max = 0;
+  String(src).replace(/\[/g, '(').replace(/\]/g, ')').split('').forEach(function (ch) { if (ch === '(') { p++; max = Math.max(max, p); } if (ch === ')') p--; });
+  return max;
+}
+function termesEcrits(src) {
+  var n = 0;
+  (function f(x) { if (!x.parentheses && (x.type === '+' || x.type === '-')) { f(x.g); f(x.d); } else if (!x.parentheses && x.type === 'neg') f(x.arg); else n++; })(Maths.analyser(src));
+  return n;
+}
+/** Coefficients écrits devant une lettre ou une parenthèse (« 12x », « 3(x + 1) », « 4 · x »). */
+function coefficientsEcrits(src) {
+  var t = String(src).replace(/\^\(?-?\d+\)?/g, '').replace(/\s/g, '').replace(/\|/g, ' ');
+  var res = [], re = /(\d+(?:[.,]\d+)?)\*?(?=[a-zA-Z(])/g, m;
+  while ((m = re.exec(t))) res.push(Number(m[1].replace(',', '.')));
+  return res;
+}
+/** Étapes de résolution de g = d (premier degré), mesurées par substitution. */
+function etapesEquation(g, d) {
+  function aff(s) { var v0 = Maths.evaluer(s, { x: 0 }), v1 = Maths.evaluer(s, { x: 1 }); return { a: v1.moins(v0), b: v0 }; }
+  var G = aff(g), D = aff(d), n = 0;
+  if (/\/\d/.test(g + d)) {                       // fractions : multiplier les deux membres par le dénominateur commun
+    n++;
+    var m = 1;
+    [G.a, G.b, D.a, D.b].forEach(function (f) { var dd = Number(f.den); m = m * dd / pgcdN(m, dd); });
+    G = { a: G.a.fois(m), b: G.b.fois(m) }; D = { a: D.a.fois(m), b: D.b.fois(m) };
+  } else if (/[(\[]/.test(g + d)) n++;               // développer et réduire
+  if (!G.a.estZero() && !D.a.estZero()) n++;       // inconnue des deux côtés
+  var cotX = G.a.estZero() ? D : G;
+  if (!cotX.b.estZero()) n++;                      // nombre du côté de l'inconnue
+  if (!G.a.moins(D.a).abs().egal(1)) n++;          // diviser par le coefficient
+  return n;
+}
+function pgcdN(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
+function natureSolution(r) {
+  if (r.tous) return 'tous';
+  if (!r.valeurs.length) return 'vide';
+  var vals = r.valeurs.map(function (v) { return typeof v === 'string' ? null : F.depuis(v); });
+  if (vals.some(function (v) { return v === null; })) return 'irrationnelle';
+  if (vals.every(function (v) { return v.estEntier(); })) return 'entier';
+  if (vals.every(function (v) { return v.estDecimale(); })) return 'decimal';
+  return 'fraction';
+}
+
+function controlerBornes(q, ident, d, niveau, anneeObjectif) {
+  var r = q.reponse, c = q.controle || {}, id = q.objectif;
+  var src = sourcesDepart(q);
+  var tout = src.join(' | ');
+  // nombre de lettres : D1 une seule variable (sauf systèmes, formules, monômes à deux lettres en conventions)
+  if (d === 1 && src.length && !/sys|form/.test(id)) {
+    var ls = Maths.lettres(src.map(function (x) { return '(' + x + ')'; }).join('+'));
+    verifierQue(ls.length <= 1, 'D1 : plus d\'une variable', ident + ' ' + tout);
+  }
+  // D1 : coefficients positifs devant les lettres
+  if (d === 1 && !/graph/.test(id)) verifierQue(!/-\s*\d*\s*\*?\s*[a-zA-Z(]/.test(tout.replace(/\s/g, '')), 'D1 : coefficient négatif', ident + ' ' + tout);
+  // coefficients ≤ 9 (hors contextes)
+  if (!CONTEXTE.test(id)) {
+    var co = coefficientsEcrits(tout);
+    verifierQue(co.every(function (x) { return x <= 9; }), 'coefficient > 9 (' + id + ')', ident + ' ' + tout);
+  }
+  // termes écrits (réduction)
+  if (/A9-red|A10-red/.test(id) && r.depart && c.type === 'expr') {
+    var nt = termesEcrits(r.depart);
+    verifierQue(nt <= TERMES_MAX[anneeObjectif][d], 'trop de termes à réduire', ident + ' ' + nt + ' : ' + r.depart);
+  }
+  // parenthèses : imbriquées seulement en D3 (module A) / D4 (équations de 10e)
+  src.forEach(function (x) {
+    var pr = profondeur(x);
+    if (id.charAt(0) === 'A') verifierQue(pr <= (d >= 3 ? 3 : 1), 'parenthèses imbriquées trop tôt', ident + ' ' + x);
+    else if (/res|voc/.test(id)) verifierQue(pr <= (d >= 4 ? 2 : 1) && (d >= 2 || pr === 0 || /11/.test(id)), 'parenthèses trop tôt (équation)', ident + ' ' + x);
+  });
+  // équations du premier degré : étapes et nature de la solution
+  if (c.type === 'equation' && /res|graph/.test(id)) {
+    if (!c.special) verifierQue(etapesEquation(c.g, c.d) <= ETAPES_MAX[d], 'trop d\'étapes de résolution', ident + ' ' + etapesEquation(c.g, c.d) + ' : ' + c.g + ' = ' + c.d);
+    var nat = natureSolution(r);
+    var permises;
+    if (d <= 3 || /graph/.test(id)) permises = ['entier'];
+    else if (anneeObjectif === 10) permises = niveau === 2 ? ['entier', 'fraction', 'decimal', 'vide', 'tous'] : ['entier'];
+    else permises = niveau === 2 ? ['entier', 'fraction', 'decimal', 'vide', 'tous'] : ['entier', 'decimal'];
+    verifierQue(permises.indexOf(nat) >= 0, 'solution hors calibrage (' + nat + ')', ident + ' ' + c.g + ' = ' + c.d);
+    if (nat === 'fraction') verifierQue(Number(F.depuis(r.valeurs[0]).den) <= 5, 'fraction non simple', ident);
+    if (anneeObjectif === 10 && d === 1 && /res/.test(id)) verifierQue(/^x[+-]\d+$|^\d+\+x$/.test(c.g.replace(/\s/g, '')) && /^-?\d+$/.test(c.d), 'D1 (10e) : forme x + a = b attendue', ident + ' ' + c.g + ' = ' + c.d);
+    if (anneeObjectif === 11 && d <= 1) verifierQue(!/\//.test(c.g + c.d), 'fraction avant D2 (11e)', ident);
+  }
+  // contenus réservés à une difficulté
+  if (id === 'A11-fact' && d <= 2) verifierQue(!r.nbFacteurs, 'facteur commun polynôme avant D3', ident);
+  if (id === 'A11-fact' && d === 1 && r.attendu) verifierQue(/^\d+\(/.test(r.attendu), 'D1 : facteur numérique seul attendu', ident + ' ' + r.attendu);
+  if (id === 'A11-rem' && r.forme === 'factorisee') verifierQue(d >= 3, 'factorisation par identité avant D3', ident);
+  if (id === 'A11-rem' && d <= 3 && r.forme === 'factorisee') verifierQue(/\)\(/.test(r.attendu) && !/\^2/.test(r.attendu), 'D3 : seulement a² – b²', ident + ' ' + r.attendu);
+  if (/A10-mul|A11-op|A10-expr|A11-pb/.test(id) && r.depart && /\)\(/.test(r.depart)) {
+    verifierQue(!(anneeObjectif === 10 && niveau === 1), 'produit de binômes en 10e niveau 1', ident);
+    if (id === 'A10-mul') verifierQue(d >= 1, '', ident);
+  }
+  if (id === 'A10-mul' && d <= 2 && r.depart) verifierQue(/^\(x[+-]\d\)\(x[+-]\d\)$/.test(r.depart.replace(/\s/g, '')), 'D1-D2 : (x + a)(x + b) attendu', ident + ' ' + r.depart);
+  if (id === 'A10-mul' && d === 1 && r.depart) verifierQue(!/-/.test(r.depart), 'D1 : binômes positifs', ident + ' ' + r.depart);
+  if (id === 'B11-sys' && c.equations) {
+    var max = d <= 1 ? 3 : (d <= 3 ? 5 : 6);
+    var cf = [];
+    c.equations.forEach(function (e) { var f0 = Maths.evaluer(e[0], { x: 0, y: 0 }); cf.push(Maths.evaluer(e[0], { x: 1, y: 0 }).moins(f0).abs().valeur(), Maths.evaluer(e[0], { x: 0, y: 1 }).moins(f0).abs().valeur()); });
+    if (q.type !== 'probleme') verifierQue(cf.every(function (x) { return x <= max; }), 'système : coefficient trop grand', ident + ' ' + JSON.stringify(c.equations));
+    if (d <= 2 && q.type !== 'probleme') verifierQue(cf[0] === 1, 'système : substitution attendue en D1-D2 (coefficient 1)', ident + ' ' + JSON.stringify(c.equations));
+    if (d <= 3 && r.type === 'couple') verifierQue(F.depuis(r.x).estEntier() && F.depuis(r.y).estEntier(), 'système : solution non entière avant D4', ident);
+  }
+  if (id === 'B11-deg2' && c.type === 'deg2') {
+    var nat2 = natureSolution(r);
+    verifierQue(nat2 !== 'irrationnelle', 'deuxième degré : solution irrationnelle', ident);
+    if (d === 1) verifierQue(c.g === 'x^2' && /^\d+$/.test(c.d) && Number.isInteger(Math.sqrt(Number(c.d))), 'D1 : x² = n (carré parfait) attendu', ident + ' ' + c.g + ' = ' + c.d);
+    if (d <= 3) verifierQue(!/x\^2[+-]\d+x[+-]\d+$/.test(c.g) || /\(/.test(c.g), 'trinôme avant D4', ident + ' ' + c.g);
+  }
+  if (id === 'B11-form' && c.type === 'formule') {
+    if (c.eq[1] === 'b*h/2') verifierQue(d >= 3, 'h = 2A : b avant D3', ident);
+    if (/\+/.test(c.eq[1]) && c.cible !== 'f') verifierQue(d >= 3, 'formule avec somme avant D3', ident);
+  }
+  // exemples de référence de l'enseignante : jamais proposés
+  verifierQue(!ressembleReferenceTest(q), 'exemple de référence repris', ident + ' ' + tout);
+}
+
+/* Exemples de référence (non publics), recopiés ici indépendamment de l'appli :
+ * comparaison des polynômes « g – d » ou des expressions, quelles que soient les lettres. */
+var REFERENCES_TEST = [['3x-4', '11'], ['4x-3', '2x+1'], ['(2x-3)(x+4)', '0'], ['2x^2+5x-12', '0'], ['6a^2b-9ab', '0'], ['4x^3y-16xy', '0'], ['x^2-5x+6', '0'], ['2x+y', '7'], ['x-y', '2']];
+function empreinte(src) {
+  // valeurs en quelques points, lettres prises dans l'ordre alphabétique (indépendant du nom des lettres)
+  var ls = Maths.lettres(src);
+  if (!ls.length || ls.length > 3) return null;
+  var pts = [[2, 3, 5], [-1, 4, 2], [3, -2, 7], [5, 1, -3]];
+  return pts.map(function (pt) { var v = {}; ls.forEach(function (l, i) { v[l] = pt[i]; }); return Maths.evaluer(src, v).abs().toString(); }).join('/') + '#' + ls.length;
+}
+var EMPREINTES_REF = REFERENCES_TEST.map(function (e) { return empreinte('(' + e[0] + ')-(' + e[1] + ')'); });
+function ressembleReferenceTest(q) {
+  var r = q.reponse, c = q.controle || {}, srcs = [];
+  if (r.depart) srcs.push(r.depart);
+  if (r.type === 'expr') srcs.push(r.attendu);
+  if (c.g && c.d) srcs.push('(' + c.g + ')-(' + c.d + ')');
+  if (c.eq) srcs.push('(' + c.eq[0] + ')-(' + c.eq[1] + ')');
+  if (c.equations) c.equations.forEach(function (e) { srcs.push('(' + e[0] + ')-(' + e[1] + ')'); });
+  return srcs.some(function (s) {
+    try {
+      var e = empreinte(s);
+      if (!e) return false;
+      // lettres permutées : on teste aussi l'ordre inverse pour deux lettres
+      var ls = Maths.lettres(s);
+      var e2 = ls.length === 2 ? empreinte(s.replace(new RegExp(ls[0], 'g'), '§').replace(new RegExp(ls[1], 'g'), ls[0]).replace(/§/g, ls[1])) : null;
+      return EMPREINTES_REF.indexOf(e) >= 0 || (e2 && EMPREINTES_REF.indexOf(e2) >= 0);
+    } catch (err) { return false; }
+  });
 }
 
 /* ---------- boucle principale ---------- */
@@ -368,7 +535,8 @@ var debut = Date.now();
             var ident = cle + ' ' + q.objectif + ' (' + q.type + ')';
             var o = Algebre.parId[q.objectif];
             verifierQue(o.niveaux.indexOf(niveau) >= 0 && o.annee <= annee, 'objectif hors profil dans une série', ident);
-            verifierQue(q.palier === diff + (niveau === 2 ? 1 : 0), 'palier incorrect', ident);
+            verifierQue(q.difficulte === diff, 'difficulté incorrecte', ident);
+            try { controlerBornes(q, ident, diff, niveau, o.annee); } catch (e) { echec('exception dans le contrôle des bornes', ident + ' : ' + e.stack.split('\n').slice(0, 2).join(' | ')); }
             try { controler(q, ident); } catch (e) { echec('exception dans le contrôle', ident + ' : ' + e.stack.split('\n').slice(0, 2).join(' | ')); }
             var ex = q.exemples();
             verifierQue(ex.justes.length > 0, 'aucun exemple de réponse juste', ident);
@@ -455,6 +623,43 @@ attendre(formule, 't = d/v', true, 'juste', 'formule juste');
 attendre(formule, 'd : v', true, 'juste', 'formule avec « : »');
 attendre(formule, 'd · v', false, 'faux', 'formule fausse');
 attendre(formule, 'd/t', false, 'forme', 'formule contenant encore la variable');
+
+/* ---------- erreurs typiques nommées dans la rétroaction ---------- */
+function message(question, texte) { return question.verifier(texte).message || ''; }
+verifierQue(/3a \+ 2b ne se réduit pas/.test(message(q({ type: 'expr', attendu: '5a+2b', forme: 'reduite', depart: '3a+2a+2b' }), '7ab')), 'rétroaction 3a + 2b = 5ab', message(q({ type: 'expr', attendu: '5a+2b', forme: 'reduite', depart: '3a+2a+2b' }), '7ab'));
+verifierQue(/4 \+ 5x² n'est pas 9x²/.test(message(q({ type: 'expr', attendu: '5x^2+4', forme: 'reduite', depart: '2x^2+3x^2+4' }), '9x^2')), 'rétroaction 4 + 5x² = 9x²', '');
+verifierQue(/signe moins/.test(message(q({ type: 'expr', attendu: '4x-6', forme: 'reduite', depart: '7x-(3x+6)' }), '4x+6')), 'rétroaction signe moins oublié', '');
+verifierQue(/signe moins/.test(message(q({ type: 'expr', attendu: '-6x-9', forme: 'reduite', depart: '-3(2x+3)' }), '-6x+9')), 'rétroaction signe moins oublié (– k)', '');
+verifierQue(/n'est pas a² \+ b²/.test(message(q({ type: 'expr', attendu: 'x^2+6x+9', forme: 'ordonnee', depart: '(x+3)^2' }), 'x^2+9')), 'rétroaction (a + b)² = a² + b²', '');
+verifierQue(/développé au lieu de factoriser/.test(message(q({ type: 'expr', attendu: '3x(x+2)', forme: 'factorisee', depart: '3x^2+6x' }), '3x^2+6x')), 'rétroaction développer / factoriser', '');
+verifierQue(/solution opposée/.test(message(q({ type: 'solutions', valeurs: [new F(-7), new F(7)], equation: ['x^2', '49'] }), '7')), 'rétroaction solution négative oubliée', '');
+(function () {
+  var ctxA = { annee: 10, niveau: 1 };
+  var trouve23 = false, trouveSigne = false, trouveMembre = false, k;
+  var al = new Maths.Alea('erreurs-typiques');
+  for (k = 0; k < 400 && !trouve23; k++) {
+    var qq = Algebre.creerQuestion(Algebre.parId['A10-mono'], al, 2, ctxA);
+    (qq.pieges || []).forEach(function (pg) { if (/2 · 3x = 6x, pas 6x²/.test(pg.message) && !qq.verifier(Maths.versTexte(pg.src)).juste && /6x²/.test(qq.verifier(Maths.versTexte(pg.src)).message)) trouve23 = true; });
+  }
+  verifierQue(trouve23, 'rétroaction 2 · 3x = 6x²', '');
+  for (k = 0; k < 400 && !(trouveSigne && trouveMembre); k++) {
+    var qe = Algebre.creerQuestion(Algebre.parId['B10-res'], al, 2, ctxA, { visuel: 1, erreur: 1 });
+    if (!qe.pieges) continue;
+    qe.pieges.forEach(function (pg) {
+      var m = qe.verifier(String(pg.valeur)).message;
+      if (/x \+ 5 = 12 ne donne pas x = 12 \+ 5/.test(m)) trouveSigne = true;
+      if (/Un membre a été oublié/.test(m)) trouveMembre = true;
+    });
+  }
+  verifierQue(trouveSigne, 'rétroaction « x + 5 = 12 ⇒ x = 12 + 5 »', '');
+  verifierQue(trouveMembre, 'rétroaction « un membre oublié à la règle 2 »', '');
+  var parx = false;
+  for (k = 0; k < 600 && !parx; k++) {
+    var qr = Algebre.creerQuestion(Algebre.parId['B10-voc'], al, 4, ctxA, { vraifaux: 5 });
+    if (qr.controle.type === 'regle' && !qr.controle.equivalentes && /multiplié les deux membres par x/.test(qr.choix[0].message)) parx = true;
+  }
+  verifierQue(parx, 'règle : multiplier par l\'inconnue signalé comme non équivalent', '');
+})();
 
 /* ---------- bilan ---------- */
 Object.keys(parCombinaison).forEach(function (k) {

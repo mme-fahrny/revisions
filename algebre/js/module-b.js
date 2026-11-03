@@ -57,76 +57,110 @@
   }
 
   /** Équation aléatoire selon le palier. Renvoie { g, d, sol: Fraction|null, special }. */
+  /**
+   * Équation aléatoire calibrée. options : { annee: 10 | 11, niveau: 1 | 2, uniqueSeulement }.
+   * 10e : D1 x + a = b ; D2 ax + b = c (a ≤ 9, signe moins possible) ;
+   *       D3 inconnue des deux côtés ou parenthèse simple ; D4 deux parenthèses ou parenthèses imbriquées.
+   *       Solutions entières ; en niveau 2 seulement, D4 peut donner une fraction simple, S = { } ou S = ℝ.
+   * 11e : D1 ax + b = c (positifs) ; D2 fraction simple (x/3 + 2 = 5) ; D3 fractions des deux côtés
+   *       ou parenthèses ; D4 solution décimale exacte (niveau 2 : aussi fraction simple, S = { }, S = ℝ).
+   * Renvoie { g, d, sol: Fraction|null, special }.
+   */
   function equationAleatoire(alea, p, options) {
     options = options || {};
-    var s = val(p <= 1 ? alea.entier(1, 10) : alea.entier(-6, 10));
-    var forme, g, d;
+    var annee = options.annee || 10, niveau = options.niveau || 1;
     function nz(max) { return alea.entierNonNul(-max, max); }
-    var specialPossible = p >= 4 && !options.uniqueSeulement;
-    if (specialPossible && alea.suivant() < 0.15) {
-      var k = alea.entier(2, 5), m = nz(6), b0 = nz(9);
-      var tous = alea.suivant() < 0.5;
-      var dd = k * m + b0 + (tous ? 0 : nz(5));
-      g = k + '(x' + (m < 0 ? m : '+' + m) + ')' + (b0 < 0 ? b0 : '+' + b0);
-      d = srcLin(k, dd);
-      return { g: g, d: d, sol: null, special: tous ? 'tous' : 'aucune' };
-    }
-    if (p <= 1) {
-      forme = alea.choix(['x+b=c', 'ax=c', 'ax+b=c', 'ax-b=c']);
-      var a = alea.entier(2, 6), b = alea.entier(1, 15);
-      if (forme === 'x+b=c') { g = 'x+' + b; d = String(s.plus(b)); }
-      else if (forme === 'ax=c') { g = a + 'x'; d = String(s.fois(a)); }
-      else if (forme === 'ax+b=c') { g = a + 'x+' + b; d = String(s.fois(a).plus(b)); }
-      else { g = a + 'x-' + b; d = String(s.fois(a).moins(b)); }
-      return { g: g, d: d, sol: s };
-    }
-    // membres de la forme gauche(x) = c x + d, d ajusté pour obtenir la solution s
-    var fractionnaire = p >= 4 && alea.suivant() < 0.4;
-    var c = alea.entier(-5, 6);
-    var gauche;
-    if (p === 2) {
-      var a2 = alea.choix([2, 3, 4, 5, 6, 7, 8, 9, -2, -3]);
-      gauche = alea.suivant() < 0.7 ? srcLin(a2, nz(12)) : nz(12) + '-' + Math.abs(a2) + 'x';
-    } else if (p === 3) {
-      var k3 = alea.entier(2, 6), m3 = nz(7);
-      gauche = alea.choix([
-        k3 + '(x' + (m3 < 0 ? m3 : '+' + m3) + ')',
-        k3 + '(' + srcLin(alea.entier(1, 3), m3) + ')' + (nz(9) > 0 ? '+' : '-') + alea.entier(1, 9),
-        alea.entier(2, 15) + '-(' + srcLin(1, m3) + ')',
-        '-' + k3 + '(' + srcLin(1, m3) + ')+' + alea.entier(1, 9) + 'x'
-      ]);
-    } else if (p === 4) {
-      var k4 = alea.entier(2, 5), j4 = alea.entier(2, 5);
-      gauche = k4 + '(' + srcLin(alea.entier(1, 4), nz(6)) + ')-' + j4 + '(' + srcLin(alea.entier(1, 3), nz(6)) + ')';
-    } else {
-      var den1 = alea.choix([2, 3, 4, 5]), den2 = alea.choix([2, 3, 4, 6]);
-      if (den1 === den2) den2 = den1 === 2 ? 3 : 2;
-      var num1 = srcLin(alea.entier(1, 5), nz(7)), num2 = srcLin(alea.entierNonNul(-3, 4), nz(7));
-      g = '(' + num1 + ')/' + den1;
-      d = '(' + num2 + ')/' + den2;
-      var r5 = resoudreLineaire(g, d);
-      if (r5.type !== 'unique') return equationAleatoire(alea, p, options);
-      return { g: g, d: d, sol: r5.valeur };
-    }
-    var PG = P.depuis(gauche);
-    var aG = P.coef(PG, { x: 1 });
-    if (aG.egal(c)) c = c + 1;
-    var dConst;
-    if (fractionnaire) {
-      dConst = val(nz(15));
+    function sgn(n) { return n < 0 ? String(n) : '+' + n; }
+    for (var essai = 0; essai < 200; essai++) {
+      var g, d, s;
+      if (niveau === 2 && p >= 4 && !options.uniqueSeulement && alea.suivant() < 0.12) {
+        var k0 = alea.entier(2, 5), m0 = nz(6), b0 = nz(9);
+        var tous = alea.suivant() < 0.5;
+        g = k0 + '(x' + sgn(m0) + ')' + sgn(b0);
+        d = srcLin(k0, k0 * m0 + b0 + (tous ? 0 : nz(5)));
+        return { g: g, d: d, sol: null, special: tous ? 'tous' : 'aucune' };
+      }
+      if (annee <= 10 && p <= 1) {
+        s = alea.entier(1, 15);
+        var b1 = alea.entier(1, 15);
+        var f1 = alea.choix(['x+b', 'b+x', 'x-b']);
+        if (f1 === 'x-b') { g = 'x-' + b1; d = String(s - b1); if (s - b1 < 0) continue; }
+        else { g = f1 === 'x+b' ? 'x+' + b1 : b1 + '+x'; d = String(s + b1); }
+        return { g: g, d: d, sol: val(s) };
+      }
+      if ((annee <= 10 && p === 2) || (annee >= 11 && p <= 1)) {
+        // 11e D1 : exercice de base, coefficients positifs (ax + b = c ou ax – b = c)
+        var a2 = alea.entier(2, 9), b2 = alea.entier(1, 15);
+        s = alea.entier(-4, 8);
+        var f2 = alea.choix(annee >= 11 ? ['ax+b', 'ax-b'] : ['ax+b', 'ax-b', '-ax+b']);
+        if (annee >= 11) s = alea.entier(1, 9);
+        if (f2 === 'ax+b') g = a2 + 'x+' + b2;
+        else if (f2 === 'ax-b') g = a2 + 'x-' + b2;
+        else g = '-' + a2 + 'x+' + b2;
+        d = String(Maths.evaluer(g, { x: s }));
+        if (Math.abs(Number(d)) > 50) continue;
+        return { g: g, d: d, sol: val(s) };
+      }
+      if (annee >= 11 && p === 2) {
+        var k2 = alea.entier(2, 5), a3 = alea.entier(1, 9), t = alea.entier(-4, 6);
+        var f3 = alea.choix(['x/k+a', 'x/k-a', '(x+a)/k']);
+        if (f3 === '(x+a)/k') { s = k2 * t - a3; g = '(x+' + a3 + ')/' + k2; }
+        else { s = k2 * t; g = 'x/' + k2 + (f3 === 'x/k+a' ? '+' : '-') + a3; }
+        d = String(Maths.evaluer(g, { x: s }));
+        return { g: g, d: d, sol: val(s) };
+      }
+      var gauche, c;
+      s = val(alea.entier(-6, 10));
+      if (annee <= 10 && p === 3) {
+        // inconnue des deux côtés, ou parenthèse simple
+        var a4 = alea.entierNonNul(-9, 9), k4 = alea.entier(2, 6), m4 = alea.entierNonNul(-7, 7);
+        gauche = alea.choix([srcLin(a4, nz(12)), k4 + '(x' + sgn(m4) + ')', k4 + '(x' + sgn(m4) + ')' + sgn(nz(9))]);
+        c = alea.entier(-5, 6);
+      } else if (annee >= 11 && p === 3) {
+        if (alea.suivant() < 0.5) {
+          var k5 = alea.choix([2, 3, 4]), j5 = alea.choix([3, 4, 6]);
+          if (k5 === j5) continue;
+          var mult = k5 * j5 / O.pgcd(k5, j5);
+          s = val(mult * alea.entier(-2, 3));
+          g = 'x/' + k5 + sgn(alea.entierNonNul(-6, 6));
+          var dd = Maths.evaluer(g, { x: s }).moins(s.divise(j5));
+          if (!dd.estEntier()) continue;
+          d = 'x/' + j5 + (dd.estZero() ? '' : sgn(Number(dd.num)));
+          return { g: g, d: d, sol: s };
+        }
+        gauche = alea.entier(2, 5) + '(' + srcLin(alea.entier(1, 3), nz(6)) + ')-(' + srcLin(1, nz(6)) + ')';
+        c = alea.entier(-4, 5);
+      } else {
+        // D4 : deux parenthèses ou parenthèses imbriquées
+        var k6 = alea.entier(2, 5), j6 = alea.entier(2, 4), m6 = alea.entier(1, 6);
+        gauche = alea.choix([
+          k6 + '(' + srcLin(alea.entier(1, 4), nz(6)) + ')-' + j6 + '(' + srcLin(alea.entier(1, 3), nz(6)) + ')',
+          k6 + '(x-(' + m6 + '-x))' + sgn(nz(9)),
+          nz(9) + '-' + k6 + '(' + srcLin(1, nz(6)) + ')'
+        ]);
+        c = alea.entier(-4, 6);
+      }
+      var PG = P.depuis(gauche);
+      if (P.coef(PG, { x: 1 }).egal(c)) continue;
+      var decimal = annee >= 11 && p >= 4 && alea.suivant() < 0.6;
+      var fraction = annee <= 10 && p >= 4 && niveau === 2 && alea.suivant() < 0.4;
+      if (annee >= 11 && p >= 4 && niveau === 2 && !decimal && alea.suivant() < 0.4) fraction = true;
+      if (decimal || fraction) {
+        var A = P.coef(PG, { x: 1 }).moins(c);
+        if (A.estZero()) continue;
+        var cible = decimal ? val(alea.entierNonNul(-25, 45)).divise(alea.choix([2, 4, 5, 10])) : val(alea.entierNonNul(-20, 20)).divise(alea.entier(2, 5));
+        if (cible.estEntier() || (fraction && Number(cible.den) > 5) || (decimal && !cible.estDecimale())) continue;
+        s = cible;
+      }
+      var dConst = P.valeur(PG, { x: s }).moins(s.fois(c));
+      if (!dConst.estEntier() || dConst.abs().compare(60) > 0) continue;
       d = srcLin(c, dConst);
-      var r = resoudreLineaire(gauche, d);
-      if (r.type !== 'unique') return equationAleatoire(alea, p, options);
-      return { g: gauche, d: d, sol: r.valeur };
+      if (c !== 0 && alea.suivant() < 0.25) return { g: d, d: gauche, sol: s };
+      return { g: gauche, d: d, sol: s };
     }
-    // d = G(s) – c s
-    dConst = P.valeur(PG, { x: s }).moins(s.fois(c));
-    d = srcLin(c, dConst);
-    if (alea.suivant() < 0.25 && c !== 0) { var t = g; g = d; d = gauche; return { g: g, d: d, sol: s }; }
-    return { g: gauche, d: d, sol: s };
+    throw new Error('équation : génération impossible');
   }
 
-  /** Étapes de résolution (savoir-faire de l'aide-mémoire). */
   function etapesLineaire(g, d, lettre) {
     lettre = lettre || 'x';
     var st = [], n = 1;
@@ -181,7 +215,8 @@
     if (!A.estZero()) {
       // terme constant déplacé sans changer de signe
       var faux1 = e.d.plus(e.b);
-      if (!faux1.egal(B)) pieges.push({ valeur: faux1.divise(A), message: 'Erreur de signe en changeant un nombre de membre : pour faire disparaître ' + tn(e.b) + ' à gauche, on ' + (e.b.signe() > 0 ? 'soustrait ' : 'ajoute ') + tn(e.b.abs()) + ' aux DEUX membres (règle 2).' });
+      if (!faux1.egal(B)) pieges.push({ valeur: faux1.divise(A), message: 'Erreur de signe : x + 5 = 12 ne donne pas x = 12 + 5. Pour faire disparaître ' + tn(e.b) + ' à gauche, on ' + (e.b.signe() > 0 ? 'soustrait ' : 'ajoute ') + tn(e.b.abs()) + ' aux DEUX membres (règle 2).' });
+      if (!e.b.estZero() && !e.d.divise(A).egal(B.divise(A))) pieges.push({ valeur: e.d.divise(A), message: 'Un membre a été oublié : ' + tn(e.b) + ' a disparu à gauche, mais il faut aussi ' + (e.b.signe() > 0 ? 'le soustraire' : 'l\'ajouter') + ' dans le membre de droite (règle 2 : même opération des deux côtés).' });
       // soustraction au lieu de division
       if (A.compare(1) !== 0) pieges.push({ valeur: B.moins(A), message: 'Pour isoler x dans ' + tn(A) + 'x = ' + tn(B) + ', on DIVISE les deux membres par ' + tn(A) + ' (règle 3) : on ne soustrait pas ' + tn(A) + '.' });
       if (!B.estZero()) pieges.push({ valeur: A.divise(B), message: 'Tu as divisé dans le mauvais sens : ' + tn(A) + 'x = ' + tn(B) + ' donne x = ' + tn(B) + ' : ' + O.tnp(A) + '.' });
@@ -211,17 +246,24 @@
     });
   }
 
-  function genResoudre(alea, p) { return qResolution(alea, p, equationAleatoire(alea, p)); }
-  function genResoudreBalance(alea, p) {
+  function optionsEq(ctx) { return { annee: ctx && ctx.objectifAnnee || 10, niveau: ctx && ctx.niveau || 1 }; }
+  function genResoudre(alea, p, ctx) { return qResolution(alea, p, equationAleatoire(alea, p, optionsEq(ctx))); }
+  function genResoudreBalance(alea, p, ctx) {
     var eq;
     var k = 0;
-    do { eq = equationAleatoire(alea, Math.min(p, 3), { uniqueSeulement: true }); k++; } while (k < 20 && !eq.sol.estEntier());
+    var o = optionsEq(ctx); o.uniqueSeulement = true;
+    do { eq = equationAleatoire(alea, Math.min(p, 3), o); k++; } while (k < 20 && !eq.sol.estEntier());
     return qResolution(alea, p, eq, { balance: true });
   }
 
-  function genResoudreErreur(alea, p) {
+  function genResoudreErreur(alea, p, ctx) {
     var eq;
-    do { eq = equationAleatoire(alea, Math.max(2, Math.min(p, 4)), { uniqueSeulement: true }); } while (!eq.sol.estEntier());
+    var o = optionsEq(ctx); o.uniqueSeulement = true;
+    // pas de fraction dans le calcul de l'élève fictif : en 11e, D1 et D2 reprennent une équation sans dénominateur
+    var pe = o.annee >= 11 && p <= 2 ? 1 : Math.max(2, p);
+    var k = 0;
+    do { eq = equationAleatoire(alea, pe, o); k++; } while ((!eq.sol.estEntier() || /\//.test(eq.g + eq.d)) && k < 300);
+    if (k >= 300) throw new Error('erreur : équation introuvable');
     var e = lineaire(eq.g, eq.d);
     var lignes = [[eq.g, eq.d]];
     var avecDev = tx(P.src(e.PG)) !== tx(eq.g) || tx(P.src(e.PD)) !== tx(eq.d);
@@ -233,16 +275,16 @@
     // supprimer les lignes identiques consécutives
     lignes = lignes.filter(function (l, i) { return i === 0 || tx(l[0]) + tx(l[1]) !== tx(lignes[i - 1][0]) + tx(lignes[i - 1][1]); });
     var types = [];
-    if (!b.estZero()) types.push('signe');
+    if (!b.estZero()) types.push('signe', 'unMembre');
     if (!A.egal(1)) types.push('division');
     if (avecDev && /-\d*\(/.test(eq.g.replace(/\s/g, ''))) types.push('distribution');
-    if (!types.length) return genResoudreErreur(alea, p);
+    if (!types.length) return genResoudreErreur(alea, p, ctx);
     var t = alea.choix(types);
     if (t === 'division' && dd.moins(b).moins(A).egal(dd.moins(b).divise(A))) {
-      if (types.indexOf('signe') < 0) return genResoudreErreur(alea, p);
+      if (types.indexOf('signe') < 0) return genResoudreErreur(alea, p, ctx);
       t = 'signe';
     }
-    if (t === 'signe' && dd.plus(b).divise(A).egal(dd.moins(b).divise(A))) return genResoudreErreur(alea, p);
+    if ((t === 'signe' && dd.plus(b).divise(A).egal(dd.moins(b).divise(A))) || (t === 'unMembre' && dd.divise(A).egal(dd.moins(b).divise(A)))) return genResoudreErreur(alea, p, ctx);
     var fausse, explication;
     var idxSigne = lignes.findIndex(function (l) { return tx(l[1]) === tx(P.src(P.constante(dd.moins(b)))) && l[0] === srcLin(A, 0); });
     if (t === 'signe') {
@@ -250,7 +292,12 @@
       var c2 = dd.plus(b);
       lignes[fausse] = [srcLin(A, 0), P.src(P.constante(c2))];
       lignes[fausse + 1] = ['x', P.src(P.constante(c2.divise(A)))];
-      explication = 'Pour supprimer ' + tn(b) + ' dans le membre de gauche, il faut ' + (b.signe() > 0 ? 'soustraire ' : 'ajouter ') + tn(b.abs()) + ' aux DEUX membres : le nombre change de signe en « changeant de membre ».';
+      explication = 'Erreur de signe : comme « x + 5 = 12 donne x = 12 + 5 », l\'élève a gardé le signe. Pour supprimer ' + tn(b) + ' dans le membre de gauche, il faut ' + (b.signe() > 0 ? 'soustraire ' : 'ajouter ') + tn(b.abs()) + ' aux DEUX membres (règle 2).';
+    } else if (t === 'unMembre') {
+      fausse = idxSigne;
+      lignes[fausse] = [srcLin(A, 0), P.src(P.constante(dd))];
+      lignes[fausse + 1] = ['x', P.src(P.constante(dd.divise(A)))];
+      explication = 'Un membre a été oublié : l\'élève a ' + (b.signe() > 0 ? 'soustrait ' : 'ajouté ') + tn(b.abs()) + ' dans le membre de gauche seulement. La règle (2) s\'applique aux DEUX membres.';
     } else if (t === 'division') {
       fausse = lignes.length - 1;
       lignes[fausse] = ['x', P.src(P.constante(dd.moins(b).moins(A)))];
@@ -264,7 +311,7 @@
       });
       var ef = lineaire(gFaux, eq.d);
       var Af = ef.a.moins(ef.c);
-      if (Af.estZero()) return genResoudreErreur(alea, p);
+      if (Af.estZero()) return genResoudreErreur(alea, p, ctx);
       lignes = [[eq.g, eq.d], [P.src(ef.PG), P.src(ef.PD)], [srcLin(Af, ef.b), P.src(P.constante(ef.d))], [srcLin(Af, 0), P.src(P.constante(ef.d.moins(ef.b)))], ['x', P.src(P.constante(ef.d.moins(ef.b).divise(Af)))]];
       explication = 'En supprimant la parenthèse précédée d\'un signe « – », il faut changer le signe de TOUS ses termes : l\'élève a oublié de distribuer le signe moins.';
     }
@@ -288,8 +335,9 @@
   /* =====================================================================
    * Vocabulaire : solution, équations équivalentes, règles
    * ===================================================================== */
-  function genEstSolution(alea, p) {
-    var eq = equationAleatoire(alea, Math.min(p, 3), { uniqueSeulement: true });
+  function genEstSolution(alea, p, ctx) {
+    var o = optionsEq(ctx); o.uniqueSeulement = true;
+    var eq = equationAleatoire(alea, Math.min(p, 3), o);
     var vrai = alea.suivant() < 0.5;
     var v = vrai ? eq.sol : eq.sol.plus(alea.entierNonNul(-3, 3));
     var vv = {}; vv.x = v;
@@ -315,12 +363,13 @@
   }
 
   function genRegles(alea, p) {
-    var s = alea.entierNonNul(-5, 8);
-    var a = alea.entier(2, 7), b = alea.entierNonNul(-9, 9), c = alea.entier(-3, 5);
+    var s = p <= 1 ? alea.entier(1, 8) : alea.entierNonNul(-5, 8);
+    var a = alea.entier(2, 7), b = p <= 1 ? alea.entier(1, 9) : alea.entierNonNul(-9, 9), c = p <= 2 ? 0 : alea.entier(-3, 5);
     if (c === a) c++;
     var d = (a - c) * s + b;
     var g1 = srcLin(a, b), d1 = srcLin(c, d);
-    var cas = alea.choix(['r1', 'r2', 'r2x', 'r3', 'un', 'parx', 'un']);
+    // D1 : règle 2 avec des nombres ; D2 : + règle 3 ; D3 : + règle 1, monôme ; D4 : + multiplier ou diviser par l'inconnue
+    var cas = alea.choix(p <= 1 ? ['r2', 'un'] : (p === 2 ? ['r2', 'r3', 'un'] : (p === 3 ? ['r1', 'r2x', 'r3', 'un'] : ['r1', 'r2x', 'r3', 'un', 'parx'])));
     var g2, d2, bonne, explication;
     var k = alea.entier(2, 6);
     if (cas === 'r1') {
@@ -344,7 +393,7 @@
       bonne = 0; explication = 'On a ajouté ' + k + ' au membre de gauche SEULEMENT : les équations ne sont pas équivalentes (elles n\'ont pas les mêmes solutions).';
     } else {
       g2 = P.src(P.fois(P.lettre('x'), P.depuis(g1))); d2 = P.src(P.fois(P.lettre('x'), P.depuis(d1)));
-      bonne = 0; explication = 'On a multiplié les deux membres par x : ce n\'est pas permis, car x peut valoir 0. La nouvelle équation a une solution de plus (x = 0) : elle n\'est pas équivalente.';
+      bonne = 0; explication = 'On a multiplié les deux membres par x, l\'inconnue : ce n\'est pas permis (règle 3 : multiplier par un nombre NON NUL), car x peut valoir 0. La nouvelle équation a une solution de plus (x = 0) : elle n\'est pas équivalente. De même, diviser par x peut faire perdre une solution : x² = x a deux solutions, 0 et 1.';
     }
     var options = [
       { h: REGLES[1], juste: bonne === 1 },
@@ -370,6 +419,22 @@
    * ===================================================================== */
   function probleme(alea, p) {
     var prenoms = alea.melanger(O.PRENOMS).slice(0, 3);
+    var simples = [
+      function () {
+        var a = alea.entier(8, 30), n = alea.entier(5, 40);
+        return { texte: 'Le toit de la salle de sport compte déjà ' + a + ' panneaux solaires. Le projet en prévoit ' + (a + n) + ' en tout.',
+          question: 'Combien de panneaux faut-il encore installer ?', inconnue: 'x = le nombre de panneaux à installer',
+          autresInconnues: ['x = le nombre total de panneaux', 'x = le nombre de panneaux déjà installés'], eq: [a + '+x', String(a + n)], sol: n, unite: 'panneaux',
+          faux: [[a + 'x', String(a + n), 'On AJOUTE les panneaux à installer à ceux qui sont déjà là : ' + a + ' + x.'], ['x', String(a + n), 'N\'oublie pas les ' + a + ' panneaux déjà installés.']] };
+      },
+      function () {
+        var a = alea.entier(5, 40), n = alea.entier(10, 60);
+        return { texte: prenoms[0] + ' a reçu ' + Maths.formaterMontant(a) + ' pour son anniversaire. Avec ses économies, il ou elle a maintenant ' + Maths.formaterMontant(a + n) + '.',
+          question: 'Combien ' + prenoms[0] + ' avait-il ou elle économisé avant ?', inconnue: 'x = le montant économisé avant l\'anniversaire (en francs)',
+          autresInconnues: ['x = le montant reçu', 'x = le montant total'], eq: ['x+' + a, String(a + n)], sol: n, unite: 'francs',
+          faux: [['x', String(a + n), 'N\'oublie pas le montant reçu.'], ['x-' + a, String(a + n), 'Le montant reçu s\'AJOUTE aux économies.']] };
+      }
+    ];
     var bank = [
       function () {
         var f = alea.choix([30, 40, 45, 60]), u = alea.choix([4, 5, 6, 8]), n = alea.entier(5, 20);
@@ -418,7 +483,10 @@
           faux: [['x+' + dif + 'x+' + nuls, String(total), 'Les victoires valent x + ' + dif + ' (' + dif + ' DE PLUS que les défaites).'], ['x+(x+' + dif + ')', String(total), 'N\'oublie pas les ' + nuls + ' matchs nuls.']] };
       }
     ];
-    if (p >= 3) bank.push(function () {
+    var deuxEtapes = [bank[0], bank[4]];
+    var troisEtapes = [bank[1], bank[2], bank[3], bank[5]];
+    var autres = [];
+    autres.push(function () {
       var u1 = alea.choix([4, 5, 6]), u2 = u1 + alea.choix([2, 3, 4]), n = alea.entier(6, 18);
       var f = (u2 - u1) * n;
       return { texte: 'Deux offres pour une salle d\'escalade : l\'offre A coûte ' + Maths.formaterMontant(f) + ' d\'abonnement, puis ' + Maths.formaterMontant(u1) + ' par entrée ; l\'offre B coûte ' + Maths.formaterMontant(u2) + ' par entrée, sans abonnement.',
@@ -426,7 +494,7 @@
         autresInconnues: ['x = le prix de l\'offre A', 'x = la différence de prix'], eq: [f + '+' + u1 + 'x', u2 + 'x'], sol: n, unite: 'entrées',
         faux: [[f + '+' + u1 + 'x+' + u2 + 'x', '0', 'On cherche quand les deux prix sont ÉGAUX : prix A = prix B.'], [f + 'x+' + u1, u2 + 'x', 'L\'abonnement se paie une seule fois : c\'est le prix par entrée qui multiplie x.']] };
     });
-    if (p >= 3) bank.push(function () {
+    autres.push(function () {
       var l = alea.entier(4, 12), a = alea.entier(1, 6);
       var L = 2 * l + a;
       var per = 2 * (L + l);
@@ -435,11 +503,15 @@
         autresInconnues: ['x = la longueur du terrain', 'x = le périmètre'], eq: ['2(2x+' + a + ')+2x', String(per)], sol: l, unite: 'm',
         faux: [['2(x+' + a + ')+2x', String(per), 'La longueur vaut le DOUBLE de la largeur, plus ' + a + ' : 2x + ' + a + '.'], ['2x+' + a + '+x', String(per), 'Le périmètre comprend deux longueurs et deux largeurs.']] };
     });
-    return alea.choix(bank)();
+    // D1 : une étape ; D2 : deux étapes ; D3 : plusieurs quantités ; D4 : inconnue des deux côtés, longueur double
+    var liste = p <= 1 ? simples : (p === 2 ? deuxEtapes : (p === 3 ? troisEtapes : autres));
+    return alea.choix(liste)();
   }
+  /** 11e : les problèmes commencent au niveau de la 10e D2. */
+  function difficulteProbleme(p, ctx) { return (ctx && ctx.objectifAnnee >= 11) ? Math.min(4, p + 1) : p; }
 
-  function genProblemeEquation(alea, p) {
-    var pb = probleme(alea, p);
+  function genProblemeEquation(alea, p, ctx) {
+    var pb = probleme(alea, difficulteProbleme(p, ctx));
     var opts = [{ h: heq(pb.eq[0], pb.eq[1]), juste: true, message: 'Avec ' + pb.inconnue + ', cette équation traduit bien l\'énoncé.' }];
     pb.faux.forEach(function (f) { opts.push({ h: heq(f[0], f[1]), juste: false, message: f[2] }); });
     return Q({
@@ -455,8 +527,8 @@
     });
   }
 
-  function genProblemeResoudre(alea, p) {
-    var pb = probleme(alea, p);
+  function genProblemeResoudre(alea, p, ctx) {
+    var pb = probleme(alea, difficulteProbleme(p, ctx));
     var st = [etape(1, 'Choisir l\'inconnue : ' + pb.inconnue + '.', ''), etape(2, 'Traduire l\'énoncé par une équation.', heq(pb.eq[0], pb.eq[1]))];
     etapesLineaire(pb.eq[0], pb.eq[1]).forEach(function (e, i) { e.titre = 'ÉTAPE ' + (i + 3); st.push(e); });
     st.push(etape(st.length + 1, 'Répondre à la question par une phrase.', O.echapper(pb.question.replace(/ \?$/, '') + ' : ' + pb.sol + (pb.unite ? ' ' + pb.unite : '') + '.')));
@@ -474,8 +546,8 @@
     });
   }
 
-  function genProblemeInconnue(alea, p) {
-    var pb = probleme(alea, p);
+  function genProblemeInconnue(alea, p, ctx) {
+    var pb = probleme(alea, difficulteProbleme(p, ctx));
     var opts = [{ h: O.echapper(pb.inconnue), juste: true, message: 'C\'est la quantité demandée : on la note x.' }];
     pb.autresInconnues.forEach(function (t) { opts.push({ h: O.echapper(t), juste: false, message: 'Cette quantité est connue ou n\'est pas demandée : l\'inconnue est ce que l\'on cherche, ici ' + pb.inconnue.replace('x = ', '') + '.' }); });
     return Q({
@@ -492,7 +564,7 @@
   }
 
   function genProblemeExpression(alea, p) {
-    var pb = probleme(alea, Math.max(p, 3));
+    var pb = probleme(alea, Math.max(p, 2));
     var gauche = pb.eq[0];
     return Q({
       type: 'traduction',
@@ -513,7 +585,8 @@
   function genGraphique(alea, p) {
     for (var k = 0; k < 100; k++) {
       var s = alea.entier(-4, 4);
-      var a = alea.entierNonNul(-3, 3), c = alea.entier(-3, 3);
+      var a = alea.entierNonNul(-3, 3), c = p <= 2 ? 0 : alea.entier(-3, 3);
+      if (p <= 1 && a < 0) continue;
       if (a === c) continue;
       var y0 = alea.entier(-5, 5);
       var b = y0 - a * s, d = y0 - c * s;
@@ -544,7 +617,7 @@
       var r1 = alea.entier(-5, 4), r2 = alea.entier(-4, 5);
       if (r1 === r2 && alea.suivant() < 0.8) continue;
       var poly = P.fois(O.lin(1, -r1), O.lin(1, -r2));
-      var cas = alea.choix(['axe', 'droite']);
+      var cas = p <= 2 ? 'axe' : alea.choix(['axe', 'droite']);
       var g = P.src(poly), d = '0';
       var courbes = [{ src: g, nom: 'f' }];
       var enonce;
@@ -589,36 +662,38 @@
    * ===================================================================== */
   var FORMULES = [
     { p: 1, eq: ['v', 'd/t'], contexte: 'vitesse moyenne v, distance d, durée t', cibles: {
-      d: { src: 'v*t', etapes: [['Multiplier les deux membres par t (règle 3).', 'v · t = d'], ['Écrire d en fonction de v et t.', 'd = vt']], pieges: [['v/t', 'Pour isoler d, on MULTIPLIE les deux membres par t.']] },
-      t: { src: 'd/v', etapes: [['Multiplier les deux membres par t (règle 3).', 'v · t = d'], ['Diviser les deux membres par v (règle 3).', 't = d/v']], pieges: [['d*v', 'Pour isoler t, on divise d par v.'], ['v/d', 'Le quotient est inversé : t = d/v.']] } } },
+      d: { d: 1, src: 'v*t', etapes: [['Multiplier les deux membres par t (règle 3).', 'v · t = d'], ['Écrire d en fonction de v et t.', 'd = vt']], pieges: [['v/t', 'Pour isoler d, on MULTIPLIE les deux membres par t.']] },
+      t: { d: 2, src: 'd/v', etapes: [['Multiplier les deux membres par t (règle 3).', 'v · t = d'], ['Diviser les deux membres par v (règle 3).', 't = d/v']], pieges: [['d*v', 'Pour isoler t, on divise d par v.'], ['v/d', 'Le quotient est inversé : t = d/v.']] } } },
     { p: 1, eq: ['U', 'R*I'], contexte: 'tension U, résistance R, intensité I (loi d\'Ohm)', cibles: {
-      R: { src: 'U/I', etapes: [['Diviser les deux membres par I (règle 3).', 'R = U/I']], pieges: [['U*I', 'On divise par I, on ne multiplie pas.'], ['I/U', 'Le quotient est inversé : R = U/I.']] },
-      I: { src: 'U/R', etapes: [['Diviser les deux membres par R (règle 3).', 'I = U/R']], pieges: [['U*R', 'On divise par R, on ne multiplie pas.']] } } },
+      R: { d: 1, src: 'U/I', etapes: [['Diviser les deux membres par I (règle 3).', 'R = U/I']], pieges: [['U*I', 'On divise par I, on ne multiplie pas.'], ['I/U', 'Le quotient est inversé : R = U/I.']] },
+      I: { d: 1, src: 'U/R', etapes: [['Diviser les deux membres par R (règle 3).', 'I = U/R']], pieges: [['U*R', 'On divise par R, on ne multiplie pas.']] } } },
     { p: 2, eq: ['A', 'b*h/2'], contexte: 'aire A d\'un triangle de base b et de hauteur h', cibles: {
-      b: { src: '2A/h', etapes: [['Multiplier les deux membres par 2 (règle 3).', '2A = bh'], ['Diviser les deux membres par h (règle 3).', 'b = 2A/h']], pieges: [['A/h', 'N\'oublie pas le 2 : on multiplie d\'abord les deux membres par 2.'], ['2A*h', 'On divise par h.']] },
-      h: { src: '2A/b', etapes: [['Multiplier les deux membres par 2 (règle 3).', '2A = bh'], ['Diviser les deux membres par b (règle 3).', 'h = 2A/b']], pieges: [['A/b', 'N\'oublie pas le 2 : on multiplie d\'abord les deux membres par 2.'], ['A/(2b)', 'On multiplie A par 2 (et non b) : h = 2A/b.']] } } },
+      b: { d: 3, src: '2A/h', etapes: [['Multiplier les deux membres par 2 (règle 3).', '2A = bh'], ['Diviser les deux membres par h (règle 3).', 'b = 2A/h']], pieges: [['A/h', 'N\'oublie pas le 2 : on multiplie d\'abord les deux membres par 2.'], ['2A*h', 'On divise par h.']] },
+      h: { d: 3, src: '2A/b', etapes: [['Multiplier les deux membres par 2 (règle 3).', '2A = bh'], ['Diviser les deux membres par b (règle 3).', 'h = 2A/b']], pieges: [['A/b', 'N\'oublie pas le 2 : on multiplie d\'abord les deux membres par 2.'], ['A/(2b)', 'On multiplie A par 2 (et non b) : h = 2A/b.']] } } },
     { p: 2, eq: ['E', 'P*t'], contexte: 'énergie E produite par des panneaux solaires de puissance P pendant une durée t', cibles: {
-      P: { src: 'E/t', etapes: [['Diviser les deux membres par t (règle 3).', 'P = E/t']], pieges: [['E*t', 'On divise par t.']] },
-      t: { src: 'E/P', etapes: [['Diviser les deux membres par P (règle 3).', 't = E/P']], pieges: [['E*P', 'On divise par P.']] } } },
+      P: { d: 1, src: 'E/t', etapes: [['Diviser les deux membres par t (règle 3).', 'P = E/t']], pieges: [['E*t', 'On divise par t.']] },
+      t: { d: 1, src: 'E/P', etapes: [['Diviser les deux membres par P (règle 3).', 't = E/P']], pieges: [['E*P', 'On divise par P.']] } } },
     { p: 3, eq: ['p', 'f+u*n'], contexte: 'prix p d\'un abonnement : frais fixes f plus u francs par entrée, pour n entrées', cibles: {
-      n: { src: '(p-f)/u', etapes: [['Soustraire f aux deux membres (règle 2).', 'p – f = un'], ['Diviser les deux membres par u (règle 3).', 'n = (p – f)/u']], pieges: [['p/u-f', 'On soustrait f AVANT de diviser : n = (p – f)/u.'], ['(p+f)/u', 'Erreur de signe : on soustrait f aux deux membres.']] },
-      f: { src: 'p-u*n', etapes: [['Soustraire un aux deux membres (règle 2).', 'f = p – un']], pieges: [['p+u*n', 'Erreur de signe : on soustrait un aux deux membres.']] } } },
+      n: { d: 3, src: '(p-f)/u', etapes: [['Soustraire f aux deux membres (règle 2).', 'p – f = un'], ['Diviser les deux membres par u (règle 3).', 'n = (p – f)/u']], pieges: [['p/u-f', 'On soustrait f AVANT de diviser : n = (p – f)/u.'], ['(p+f)/u', 'Erreur de signe : on soustrait f aux deux membres.']] },
+      f: { d: 2, src: 'p-u*n', etapes: [['Soustraire un aux deux membres (règle 2).', 'f = p – un']], pieges: [['p+u*n', 'Erreur de signe : on soustrait un aux deux membres.']] } } },
     { p: 3, eq: ['P', '2a+2b'], contexte: 'périmètre P d\'un rectangle de côtés a et b', cibles: {
-      a: { src: '(P-2b)/2', etapes: [['Soustraire 2b aux deux membres (règle 2).', 'P – 2b = 2a'], ['Diviser les deux membres par 2 (règle 3).', 'a = (P – 2b)/2']], pieges: [['P-2b', 'Il reste à diviser par 2 : P – 2b = 2a.'], ['P/2-2b', 'Tout le membre P – 2b est divisé par 2 : a = (P – 2b)/2 = P/2 – b.']] } } },
+      a: { d: 4, src: '(P-2b)/2', etapes: [['Soustraire 2b aux deux membres (règle 2).', 'P – 2b = 2a'], ['Diviser les deux membres par 2 (règle 3).', 'a = (P – 2b)/2']], pieges: [['P-2b', 'Il reste à diviser par 2 : P – 2b = 2a.'], ['P/2-2b', 'Tout le membre P – 2b est divisé par 2 : a = (P – 2b)/2 = P/2 – b.']] } } },
     { p: 4, eq: ['A', '(B+b)*h/2'], contexte: 'aire A d\'un trapèze de bases B et b et de hauteur h', cibles: {
-      h: { src: '2A/(B+b)', etapes: [['Multiplier les deux membres par 2 (règle 3).', '2A = (B + b)h'], ['Diviser les deux membres par (B + b) (règle 3).', 'h = 2A/(B + b)']], pieges: [['2A/B+b', 'Il faut diviser par toute la somme (B + b) : mets des parenthèses.'], ['A/(B+b)', 'N\'oublie pas le 2.']] },
-      B: { src: '2A/h-b', etapes: [['Multiplier les deux membres par 2, puis diviser par h (règle 3).', '2A/h = B + b'], ['Soustraire b aux deux membres (règle 2).', 'B = 2A/h – b']], pieges: [['2A/h+b', 'Erreur de signe : on soustrait b.']] } } },
+      h: { d: 4, src: '2A/(B+b)', etapes: [['Multiplier les deux membres par 2 (règle 3).', '2A = (B + b)h'], ['Diviser les deux membres par (B + b) (règle 3).', 'h = 2A/(B + b)']], pieges: [['2A/B+b', 'Il faut diviser par toute la somme (B + b) : mets des parenthèses.'], ['A/(B+b)', 'N\'oublie pas le 2.']] },
+      B: { d: 4, src: '2A/h-b', etapes: [['Multiplier les deux membres par 2, puis diviser par h (règle 3).', '2A/h = B + b'], ['Soustraire b aux deux membres (règle 2).', 'B = 2A/h – b']], pieges: [['2A/h+b', 'Erreur de signe : on soustrait b.']] } } },
     { p: 4, eq: ['y', 'm*x+h'], contexte: 'fonction affine y = mx + h', cibles: {
-      x: { src: '(y-h)/m', etapes: [['Soustraire h aux deux membres (règle 2).', 'y – h = mx'], ['Diviser les deux membres par m (règle 3).', 'x = (y – h)/m']], pieges: [['y/m-h', 'On soustrait h AVANT de diviser par m.'], ['(y+h)/m', 'Erreur de signe : on soustrait h.']] },
-      m: { src: '(y-h)/x', etapes: [['Soustraire h aux deux membres (règle 2).', 'y – h = mx'], ['Diviser les deux membres par x (règle 3).', 'm = (y – h)/x']], pieges: [['y/x-h', 'On soustrait h AVANT de diviser.']] } } },
+      x: { d: 4, src: '(y-h)/m', etapes: [['Soustraire h aux deux membres (règle 2).', 'y – h = mx'], ['Diviser les deux membres par m (règle 3).', 'x = (y – h)/m']], pieges: [['y/m-h', 'On soustrait h AVANT de diviser par m.'], ['(y+h)/m', 'Erreur de signe : on soustrait h.']] },
+      m: { d: 4, src: '(y-h)/x', etapes: [['Soustraire h aux deux membres (règle 2).', 'y – h = mx'], ['Diviser les deux membres par x (règle 3).', 'm = (y – h)/x']], pieges: [['y/x-h', 'On soustrait h AVANT de diviser.']] } } },
     { p: 5, eq: ['F', '1.8C+32'], contexte: 'température F en degrés Fahrenheit et C en degrés Celsius', cibles: {
-      C: { src: '(F-32)/1.8', etapes: [['Soustraire 32 aux deux membres (règle 2).', 'F – 32 = 1,8C'], ['Diviser les deux membres par 1,8 (règle 3).', 'C = (F – 32) : 1,8']], pieges: [['F/1.8-32', 'On soustrait 32 AVANT de diviser.'], ['(F-32)*1.8', 'On divise par 1,8.']] } } }
+      C: { d: 4, src: '(F-32)/1.8', etapes: [['Soustraire 32 aux deux membres (règle 2).', 'F – 32 = 1,8C'], ['Diviser les deux membres par 1,8 (règle 3).', 'C = (F – 32) : 1,8']], pieges: [['F/1.8-32', 'On soustrait 32 AVANT de diviser.'], ['(F-32)*1.8', 'On divise par 1,8.']] } } }
   ];
 
   function genFormule(alea, p) {
-    var dispo = FORMULES.filter(function (f) { return f.p <= p && f.p >= p - 2; });
-    var f = alea.choix(dispo.length ? dispo : FORMULES);
-    var cible = alea.choix(Object.keys(f.cibles));
+    // cibles de difficulté p (ou p – 1 pour varier), jamais au-dessus
+    var choix = [];
+    FORMULES.forEach(function (f) { Object.keys(f.cibles).forEach(function (k) { var dc = f.cibles[k].d; if (dc <= p && dc >= p - 1) choix.push({ f: f, cible: k }); }); });
+    var tir = alea.choix(choix);
+    var f = tir.f, cible = tir.cible;
     var c = f.cibles[cible];
     var autres = Maths.lettres(f.eq[0] + '+' + f.eq[1]).filter(function (l) { return l !== cible; });
     var lettresClavier = autres.slice().sort();
@@ -642,15 +717,20 @@
   /* =====================================================================
    * Systèmes de deux équations à deux inconnues (11e, niveau 2)
    * ===================================================================== */
+  /**
+   * D1 : substitution, coefficients ≤ 3, solution entière positive ; D2 : substitution, coefficients ≤ 5 ;
+   * D3 : combinaison linéaire, coefficients ≤ 5 ; D4 : combinaison, coefficients ≤ 6, y peut valoir k/2.
+   */
   function systemeAleatoire(alea, p, sol) {
-    for (var k = 0; k < 200; k++) {
-      var x0 = sol ? sol[0] : alea.entier(-5, 6), y0 = sol ? sol[1] : alea.entier(-4, 6);
+    var max = p <= 1 ? 3 : (p <= 3 ? 5 : 6);
+    for (var k = 0; k < 400; k++) {
+      var x0 = sol ? sol[0] : (p <= 1 ? alea.entier(1, 6) : alea.entier(-5, 6)), y0 = sol ? sol[1] : (p <= 1 ? alea.entier(1, 6) : alea.entier(-4, 6));
       if (!sol && p >= 4 && alea.suivant() < 0.4) y0 = val(alea.choix([-3, -1, 1, 3, 5, 7, 9])).divise(2);
       x0 = val(x0); y0 = val(y0);
-      var subst = p <= 2 || alea.suivant() < 0.5;
-      var a1 = subst ? 1 : alea.entierNonNul(-6, 6), b1 = alea.entierNonNul(-6, 6);
-      var a2 = alea.entierNonNul(-6, 6), b2 = alea.entierNonNul(-6, 6);
-      if (!subst && (Math.abs(a1) === 1 || Math.abs(b1) === 1 || Math.abs(a2) === 1 || Math.abs(b2) === 1) && alea.suivant() < 0.7) continue;
+      var subst = p <= 2;
+      var a1 = subst ? 1 : alea.entierNonNul(-max, max), b1 = p <= 1 ? alea.entier(1, max) : alea.entierNonNul(-max, max);
+      var a2 = p <= 1 ? alea.entier(1, max) : alea.entierNonNul(-max, max), b2 = alea.entierNonNul(-max, max);
+      if (!subst && (Math.abs(a1) === 1 || Math.abs(a2) === 1)) continue;
       if (a1 * b2 - a2 * b1 === 0) continue;
       var c1 = x0.fois(a1).plus(y0.fois(b1)), c2 = x0.fois(a2).plus(y0.fois(b2));
       if (!c1.estEntier() || !c2.estEntier()) continue;
@@ -658,6 +738,7 @@
     }
     throw new Error('système');
   }
+
   function srcXY(a, b) { return P.src(P.plus(P.monome(a, { x: 1 }), P.monome(b, { y: 1 }))); }
   function htmlSysteme(s) {
     return '<div class="systeme"><span class="accolade" aria-hidden="true">{</span><span class="systeme-lignes">' +
@@ -713,9 +794,10 @@
   }
 
   function genSystemeProbleme(alea, p) {
+    // D2 : prix entiers, coefficients ≤ 5 ; D4 : prix décimaux
     var cs = [
       function () {
-        var x = alea.choix([3, 3.5, 4, 4.5]), y = alea.choix([2, 2.5, 3, 3.5]);
+        var x = alea.choix(p >= 4 ? [3, 3.5, 4, 4.5] : [3, 4, 5]), y = alea.choix(p >= 4 ? [2, 2.5, 3, 3.5] : [2, 3]);
         var a1 = alea.entier(1, 3), b1 = alea.entier(1, 3), a2 = alea.entier(1, 4), b2 = alea.entier(1, 4);
         if (a1 * b2 === a2 * b1) b2 = b2 === 4 ? 1 : b2 + 1;
         return { x: x, y: y, a1: a1, b1: b1, a2: a2, b2: b2,
@@ -787,22 +869,23 @@
   /* =====================================================================
    * Équations du deuxième degré (11e, niveau 2)
    * ===================================================================== */
+  /**
+   * D1 : x² = n (carré parfait) ; D2 : produit nul ; D3 : x² = n, mise en évidence de x, a² – b² ;
+   * D4 : trinôme factorisable, formule de résolution avec discriminant simple (Δ carré parfait, Δ = 0 ou Δ < 0).
+   */
   function genDeg2(alea, p) {
-    var cas = ['x2n', 'produitNul', 'facteurCommun', 'diffCarres'];
-    if (p >= 3) cas.push('viete', 'viete');
-    if (p >= 5) cas.push('vieteIrr');
+    var cas = p <= 1 ? ['x2n'] : (p === 2 ? ['produitNul'] : (p === 3 ? ['x2n', 'facteurCommun', 'diffCarres'] : ['trinome', 'trinome', 'discriminant']));
     var c = alea.choix(cas);
     var g, d = '0', sols, st = [], pieges = [];
     if (c === 'x2n') {
-      var r = alea.entier(1, 12);
+      var r = alea.entier(1, 10);
       var n = r * r, irr = false, vide = false;
-      if (p >= 4 && alea.suivant() < 0.3) { n = alea.choix([2, 3, 5, 6, 7, 10, 11, 13]); irr = true; }
-      if (p >= 4 && alea.suivant() < 0.15) { n = -alea.entier(1, 20); vide = true; irr = false; }
+      if (p >= 3 && alea.suivant() < 0.15) { n = -alea.entier(1, 20); vide = true; }
       g = 'x^2'; d = String(n);
       if (vide) { sols = []; st.push(etape(1, 'Un carré n\'est jamais négatif : x² = ' + tn(n) + ' n\'a pas de solution.', hm('S = { }'))); }
       else if (irr) { sols = ['-√' + n, '√' + n]; st.push(etape(1, 'Cas x² = n avec n > 0 : deux solutions opposées, √n et – √n.', hm('x = √' + n + ' ou x = – √' + n))); st.push(etape(2, 'Écrire l\'ensemble des solutions.', hm('S = { – √' + n + ' ; √' + n + ' }'))); }
       else { sols = [fr(-r), fr(r)]; pieges.push({ valeur: r, message: 'Il manque une solution : (– ' + r + ')² = ' + n + ' aussi.' }); st.push(etape(1, 'Cas x² = n avec n > 0 : deux solutions opposées, √n et – √n.', hm('x = √' + n + ' = ' + r + ' ou x = – √' + n + ' = – ' + r))); st.push(etape(2, 'Écrire l\'ensemble des solutions.', hm(Maths.formaterSolutions(sols)))); }
-      if (alea.suivant() < 0.4 && !vide) { var k = alea.entier(1, 9); g = 'x^2+' + k; d = String(n + k); st.unshift(etape(0, 'Soustraire ' + k + ' aux deux membres (règle 2).', heq('x^2', String(n)))); }
+      if (p >= 3 && alea.suivant() < 0.4 && !vide) { var k = alea.entier(1, 9); g = 'x^2+' + k; d = String(n + k); st.unshift(etape(0, 'Soustraire ' + k + ' aux deux membres (règle 2).', heq('x^2', String(n)))); }
     } else if (c === 'produitNul') {
       var a = alea.entierNonNul(-7, 7), b = alea.entierNonNul(-7, 7);
       var k2 = p >= 3 && alea.suivant() < 0.5 ? alea.entier(2, 4) : 1;
@@ -812,6 +895,7 @@
       st.push(etape(1, 'Un produit est nul si et seulement si un des facteurs est nul.', hm(tx(f1) + ' = 0 ou ' + tx(P.src(O.lin(1, b))) + ' = 0')));
       st.push(etape(2, 'Résoudre chaque équation du premier degré.', hm('x = ' + tn(fr(a, k2)) + ' ou x = ' + tn(-b))));
       pieges.push({ valeur: -a, message: 'Attention au signe : x – ' + a + ' = 0 donne x = ' + a + '.' });
+      pieges.push({ valeur: a, message: 'Il manque une solution : un produit est nul si L\'UN OU L\'AUTRE des facteurs est nul. Inutile de développer : factorisé, le produit nul se lit directement.' });
     } else if (c === 'facteurCommun') {
       var a3 = alea.entier(1, 5), b3 = alea.entierNonNul(-9, 9);
       g = P.src(P.plus(P.monome(a3, { x: 2 }), P.monome(b3, { x: 1 })));
@@ -830,23 +914,16 @@
       st.push(etape(3, 'Écrire l\'ensemble des solutions.', hm(Maths.formaterSolutions(sols))));
     } else {
       var A, B, C, delta;
-      if (c === 'vieteIrr') {
-        do { A = 1; B = alea.entierNonNul(-6, 6); C = alea.entierNonNul(-6, 6); delta = B * B - 4 * A * C; } while (delta <= 0 || Number.isInteger(Math.sqrt(delta)));
-      } else {
-        var mode = p >= 4 ? alea.choix(['deux', 'deux', 'deux', 'une', 'aucune']) : 'deux';
-        if (mode === 'aucune') { do { A = alea.entier(1, 3); B = alea.entier(-5, 5); C = alea.entier(1, 9); delta = B * B - 4 * A * C; } while (delta >= 0); }
-        else {
-          A = p >= 4 ? alea.entier(1, 3) : 1;
-          var x1 = alea.entier(-6, 6), x2 = mode === 'une' ? x1 : alea.entier(-6, 6);
-          if (mode === 'deux' && x1 === x2) x2++;
-          // A(x – x1)(x – x2)
-          B = -A * (x1 + x2); C = A * x1 * x2;
-          if (A > 1 && alea.suivant() < 0.5 && mode === 'deux') { // racine fractionnaire : (Ax – m)(x – x2)
-            var m = alea.choix([1, -1, 3, -3, 5]);
-            if (O.pgcd(m, A) === 1) { B = -(m + A * x2); C = m * x2; }
-          }
-          delta = B * B - 4 * A * C;
-        }
+      // trinôme : x² + bx + c à racines entières ; discriminant : a > 1 (2x² – 4x + 2…), Δ carré parfait, Δ = 0 ou Δ < 0
+      var mode = c === 'trinome' ? 'deux' : alea.choix(['deux', 'une', 'une', 'aucune']);
+      if (mode === 'aucune') { do { A = alea.entier(1, 3); B = alea.entier(-5, 5); C = alea.entier(1, 9); delta = B * B - 4 * A * C; } while (delta >= 0); }
+      else {
+        A = c === 'trinome' ? 1 : alea.entier(2, 3);
+        var x1 = alea.entier(-6, 6), x2 = mode === 'une' ? x1 : alea.entier(-6, 6);
+        if (mode === 'deux' && x1 === x2) x2++;
+        // A(x – x1)(x – x2)
+        B = -A * (x1 + x2); C = A * x1 * x2;
+        delta = B * B - 4 * A * C;
       }
       g = P.src(P.plus(P.monome(A, { x: 2 }), O.lin(B, C)));
       st.push(etape(1, 'L\'équation est de la forme ax² + bx + c = 0 avec a = ' + tn(A) + ', b = ' + tn(B) + ', c = ' + tn(C) + '. Calculer le discriminant.', hm('Δ = b² – 4ac = ' + O.tnp(B) + '² – 4 · ' + O.tnp(A) + ' · ' + O.tnp(C) + ' = ' + tn(delta))));
@@ -856,10 +933,9 @@
         var rd = Math.sqrt(delta);
         if (Number.isInteger(rd)) {
           sols = [fr(-B - rd, 2 * A), fr(-B + rd, 2 * A)];
-          st.push(etape(2, 'Δ > 0 : deux solutions, x₁ et x₂ = (– b ± √Δ) : 2a (formule de Viète).', hm('x₁ = (' + tn(-B) + ' – ' + rd + ') : ' + (2 * A) + ' = ' + tn(sols[0]) + ' ; x₂ = (' + tn(-B) + ' + ' + rd + ') : ' + (2 * A) + ' = ' + tn(sols[1]))));
+          st.push(etape(2, 'Δ > 0 : deux solutions, x₁ et x₂ = (– b ± √Δ) : 2a (formule de résolution).', hm('x₁ = (' + tn(-B) + ' – ' + rd + ') : ' + (2 * A) + ' = ' + tn(sols[0]) + ' ; x₂ = (' + tn(-B) + ' + ' + rd + ') : ' + (2 * A) + ' = ' + tn(sols[1]))));
         } else {
-          sols = ['(' + (-B) + '-√' + delta + ')/' + (2 * A), '(' + (-B) + '+√' + delta + ')/' + (2 * A)];
-          st.push(etape(2, 'Δ > 0 : deux solutions, x₁ et x₂ = (– b ± √Δ) : 2a (formule de Viète). √' + delta + ' n\'est pas entier : on garde la racine.', hm('x₁ = (' + tn(-B) + ' – √' + delta + ')/' + (2 * A) + ' ; x₂ = (' + tn(-B) + ' + √' + delta + ')/' + (2 * A))));
+          throw new Error('discriminant non carré');
         }
       }
       if (sols.length) st.push(etape(3, 'Écrire l\'ensemble des solutions.', hm(typeof sols[0] !== 'string' ? Maths.formaterSolutions(sols) : 'S = { ' + sols.map(tx).join(' ; ') + ' }')));
@@ -872,11 +948,33 @@
       consigne: 'Sépare les solutions par un point-virgule : S = { – 2 ; 5 }. S\'il n\'y a pas de solution : S = { }.',
       reponse: { type: 'solutions', valeurs: sols, equation: [g, d], lettre: 'x' },
       pieges: pieges,
-      indice: c === 'viete' || c === 'vieteIrr' ? 'Calcule le discriminant Δ = b² – 4ac, puis utilise la formule de Viète.' : (c === 'x2n' ? 'Un nombre et son opposé ont le même carré.' : 'Factorise le membre de gauche, puis utilise : un produit est nul si et seulement si un des facteurs est nul.'),
+      indice: c === 'trinome' || c === 'discriminant' ? 'Calcule le discriminant Δ = b² – 4ac, puis utilise la formule de résolution (discriminant).' : (c === 'x2n' ? 'Un nombre et son opposé ont le même carré.' : 'Factorise le membre de gauche, puis utilise : un produit est nul si et seulement si un des facteurs est nul.'),
       etapes: st,
       verification: sols.length && typeof sols[0] !== 'string' ? 'Vérification : ' + sols.map(function (s) { var v = { x: s }; return 'pour x = ' + tn(s) + ', ' + hm(O.substituerTexte(g, v) + ' = ' + tn(Maths.evaluer(g, v))); }).join(' ; ') + '.' : '',
       rubrique: R.deuxieme,
       controle: { type: 'deg2', g: g, d: d, nb: sols.length }
+    });
+  }
+
+  function genDeg2VF(alea, p) {
+    var a = alea.entierNonNul(-7, 7), b = alea.entierNonNul(-7, 7);
+    while (a === -b) b = alea.entierNonNul(-7, 7);
+    var g = '(' + P.src(O.lin(1, -a)) + ')(' + P.src(O.lin(1, b)) + ')';
+    return Q({
+      type: 'vraifaux',
+      enonce: '<p>Vrai ou faux ?</p><p class="affirmation">Pour résoudre ' + heq(g, '0') + ', il faut d\'abord développer le membre de gauche.</p>',
+      consigne: 'Choisis la réponse et sa justification.',
+      reponse: { type: 'choix' }, mode: 'choix',
+      choix: O.optionsVraiFaux(alea, {
+        vrai: false,
+        justeFaux: 'le membre de gauche est déjà FACTORISÉ : un produit est nul si et seulement si un des facteurs est nul, donc x = ' + tn(a) + ' ou x = ' + tn(-b) + '. Développer ferait perdre cet avantage.',
+        autresFaux: ['on ne peut jamais résoudre une équation du deuxième degré.'],
+        autresVrai: ['on développe toujours avant de résoudre.', 'il faut obtenir la forme ax² + bx + c = 0.']
+      }),
+      indice: 'Développer transforme un produit en somme ; factoriser transforme une somme en produit. Lequel permet d\'utiliser le produit nul ?',
+      etapes: [etape(1, 'Produit nul : ' + tx(P.src(O.lin(1, -a))) + ' = 0 ou ' + tx(P.src(O.lin(1, b))) + ' = 0.', hm(Maths.formaterSolutions([a, -b])))],
+      rubrique: R.deuxieme,
+      controle: { type: 'convention', vrai: false }
     });
   }
 
@@ -897,7 +995,7 @@
           etape(1, 'Inconnue : x = la largeur (en m). Équation :', heq('x(x+' + a + ')', String(aire))),
           etape(2, 'Ramener à la forme ax² + bx + c = 0 (règles 1 et 2).', heq(P.src(P.depuis('x^2+' + a + 'x-' + aire)), '0')),
           etape(3, 'Calculer le discriminant.', hm('Δ = ' + a + '² – 4 · 1 · (– ' + aire + ') = ' + (a * a + 4 * aire))),
-          etape(4, 'Formule de Viète.', hm('x₁ = ' + tn(-(l + a)) + ' ; x₂ = ' + l)),
+          etape(4, 'Formule de résolution (discriminant).', hm('x₁ = ' + tn(-(l + a)) + ' ; x₂ = ' + l)),
           etape(5, 'Une largeur est positive : on garde x = ' + l + '. La plate-bande mesure ' + l + ' m de large.', '')
         ],
         verification: 'Vérification : ' + l + ' · ' + (l + a) + ' = ' + aire + '.',
@@ -916,7 +1014,7 @@
       etapes: [
         etape(1, 'Inconnue : x = le plus petit nombre. Équation :', heq('x(x+1)', String(n * (n + 1)))),
         etape(2, 'Forme ax² + bx + c = 0.', heq('x^2+x-' + (n * (n + 1)), '0')),
-        etape(3, 'Discriminant et formule de Viète.', hm('Δ = 1 + 4 · ' + (n * (n + 1)) + ' = ' + (1 + 4 * n * (n + 1)) + ' ; x₁ = – ' + (n + 1) + ' ; x₂ = ' + n)),
+        etape(3, 'Discriminant et formule de résolution.', hm('Δ = 1 + 4 · ' + (n * (n + 1)) + ' = ' + (1 + 4 * n * (n + 1)) + ' ; x₁ = – ' + (n + 1) + ' ; x₂ = ' + n)),
         etape(4, 'Les nombres sont des entiers naturels : on garde ' + n + '.', '')
       ],
       verification: 'Vérification : ' + n + ' · ' + (n + 1) + ' = ' + (n * (n + 1)) + '.',
@@ -928,33 +1026,32 @@
   /* =====================================================================
    * Catalogue des objectifs du module B
    * ===================================================================== */
-  function plus1(gen) { return function (a, p, c) { return gen(a, Math.min(5, p + 1), c); }; }
-
   var objectifs = [
     { id: 'B10-voc', module: 'B', annee: 10, niveaux: [1, 2], theme: 'FA 10.3', titre: 'Équation, solution, équations équivalentes, règles d\'équivalence',
       modeles: [{ type: 'vraifaux', gen: genEstSolution }, { type: 'directe', gen: genRegles }] },
     { id: 'B10-res', module: 'B', annee: 10, niveaux: [1, 2], theme: 'FA 10.3', titre: 'Résoudre une équation du premier degré et vérifier la solution',
-      modeles: [{ type: 'directe', gen: genResoudre }, { type: 'visuel', gen: genResoudreBalance }, { type: 'erreur', gen: genResoudreErreur }] },
+      modeles: [{ type: 'directe', gen: genResoudre }, { type: 'visuel', gen: genResoudreBalance }, { type: 'erreur', gen: genResoudreErreur, dMin: 2 }] },
     { id: 'B10-pb', module: 'B', annee: 10, niveaux: [1, 2], theme: 'FA 10.3', titre: 'Identifier l\'inconnue et traduire une situation par une équation',
       modeles: [{ type: 'directe', gen: genProblemeInconnue }, { type: 'traduction', gen: genProblemeEquation }, { type: 'probleme', gen: genProblemeResoudre }] },
     { id: 'B10-graph', module: 'B', annee: 10, niveaux: [2], theme: 'FA 10.3', titre: 'Résoudre une équation du premier degré par voie graphique',
       modeles: [{ type: 'visuel', gen: genGraphique }] },
 
     { id: 'B11-pb', module: 'B', annee: 11, niveaux: [1, 2], theme: 'FA 11.2', titre: 'Traduire une situation par une expression, puis par une équation',
-      modeles: [{ type: 'traduction', gen: genProblemeExpression }, { type: 'probleme', gen: plus1(genProblemeResoudre) }, { type: 'traduction', gen: plus1(genProblemeEquation) }] },
+      modeles: [{ type: 'traduction', gen: genProblemeExpression }, { type: 'probleme', gen: genProblemeResoudre }, { type: 'traduction', gen: genProblemeEquation }] },
     { id: 'B11-res', module: 'B', annee: 11, niveaux: [1, 2], theme: 'FA 11.2', titre: 'Résoudre une équation du premier degré',
-      modeles: [{ type: 'directe', gen: plus1(genResoudre) }, { type: 'erreur', gen: plus1(genResoudreErreur) }] },
+      modeles: [{ type: 'directe', gen: genResoudre }, { type: 'erreur', gen: genResoudreErreur }] },
     { id: 'B11-form', module: 'B', annee: 11, niveaux: [1, 2], theme: 'FA 11.2', titre: 'Exprimer une variable d\'une formule en fonction des autres',
       modeles: [{ type: 'directe', gen: genFormule }] },
     { id: 'B11-graph', module: 'B', annee: 11, niveaux: [1, 2], theme: 'FA 11.2', titre: 'Résoudre une équation du premier degré par voie graphique',
       modeles: [{ type: 'visuel', gen: genGraphique }] },
     { id: 'B11-sys', module: 'B', annee: 11, niveaux: [2], theme: 'FA 11.2', titre: 'Systèmes de deux équations à deux inconnues',
-      modeles: [{ type: 'directe', gen: genSysteme }, { type: 'probleme', gen: genSystemeProbleme }, { type: 'vraifaux', gen: genSystemeVF }] },
-    { id: 'B11-deg2', module: 'B', annee: 11, niveaux: [2], theme: 'FA 11.2', titre: 'Équations du deuxième degré (factorisation, formule de Viète)',
-      modeles: [{ type: 'directe', gen: genDeg2 }, { type: 'probleme', gen: genDeg2Probleme }] },
+      modeles: [{ type: 'directe', gen: genSysteme }, { type: 'probleme', gen: genSystemeProbleme, dMin: 2 }, { type: 'vraifaux', gen: genSystemeVF }] },
+    { id: 'B11-deg2', module: 'B', annee: 11, niveaux: [2], theme: 'FA 11.2', titre: 'Équations du deuxième degré (factorisation, formule de résolution)',
+      modeles: [{ type: 'directe', gen: genDeg2 }, { type: 'vraifaux', gen: genDeg2VF, dMin: 2 }, { type: 'probleme', gen: genDeg2Probleme, dMin: 4 }] },
     { id: 'B11-deg2g', module: 'B', annee: 11, niveaux: [2], theme: 'FA 11.2', titre: 'Résoudre une équation du deuxième degré par voie graphique',
       modeles: [{ type: 'visuel', gen: genGraphiqueDeg2 }] }
   ];
+
 
   return {
     objectifs: objectifs,

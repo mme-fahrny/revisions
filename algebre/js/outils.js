@@ -239,7 +239,7 @@
     var n = Maths.analyser(texte);
     while (n.type === 'neg') n = n.arg;
     if (n.type === '+' || n.type === '-') {
-      return 'Ta réponse est une somme : la dernière opération à effectuer est une addition ou une soustraction. Factoriser, c\'est écrire un PRODUIT (voir l\'aide-mémoire, rubrique ' + RUBRIQUES.sommeProduit + ').';
+      return 'Ta réponse est une somme : tu as développé au lieu de factoriser. Développer transforme un produit en somme ; factoriser transforme une somme en PRODUIT (voir l\'aide-mémoire, rubrique ' + RUBRIQUES.sommeProduit + ').';
     }
     var facteurs = aplatirProduit(n, []);
     var nonMonomes = 0;
@@ -348,6 +348,86 @@
     return null;
   }
 
+  /* ---------- Erreurs typiques reconnues automatiquement (à partir de l'expression de départ) ---------- */
+
+  function versSrc(n) {
+    // réécriture d'un arbre en texte lisible par Maths.analyser
+    var t;
+    switch (n.type) {
+      case 'nombre': t = '(' + n.valeur.toString() + ')'; break;
+      case 'lettre': t = n.nom; break;
+      case 'neg': t = '-(' + versSrc(n.arg) + ')'; break;
+      case '^': t = '(' + versSrc(n.base) + ')^(' + n.exposant + ')'; break;
+      case 'racine': t = (n.indice === 3 ? '∛' : '√') + '(' + versSrc(n.arg) + ')'; break;
+      default: t = '(' + versSrc(n.g) + ')' + { '+': '+', '-': '-', '*': '*', '/': '/' }[n.type] + '(' + versSrc(n.d) + ')';
+    }
+    return t;
+  }
+  function estSomme(n) { return n && (n.type === '+' || n.type === '-'); }
+  function termesSomme(n) { return aplatirSomme(Object.assign({}, n, { parentheses: false }), 1, []); }
+  function sommeDe(termes) {
+    return termes.map(function (t, i) { return (t.signe < 0 ? '-' : (i ? '+' : '')) + '(' + versSrc(t.noeud) + ')'; }).join('');
+  }
+  /** Variante « signe moins oublié » : – (a + b) écrit – a + b. */
+  function varianteMoins(n) {
+    if (!n || typeof n !== 'object') return null;
+    if (n.type === '-' && estSomme(n.d) && n.d.parentheses) {
+      var t = termesSomme(n.d);
+      return '(' + versSrc(n.g) + ')-' + sommeDe([t[0]]) + (t.length > 1 ? '+(' + sommeDe(t.slice(1)) + ')' : '');
+    }
+    if (n.type === 'neg' && estSomme(n.arg) && n.arg.parentheses) {
+      var t2 = termesSomme(n.arg);
+      return '-' + sommeDe([t2[0]]) + '+(' + sommeDe(t2.slice(1)) + ')';
+    }
+    if (n.type === 'neg' && n.arg.type === '*' && estSomme(n.arg.d) && n.arg.d.parentheses) {
+      // – k(a + b) écrit – ka + kb
+      var t3 = termesSomme(n.arg.d), k = versSrc(n.arg.g);
+      return '-(' + k + ')*' + sommeDe([t3[0]]) + '+(' + k + ')*(' + sommeDe(t3.slice(1)) + ')';
+    }
+    var cles = ['g', 'd', 'arg', 'base'];
+    for (var i = 0; i < cles.length; i++) {
+      if (!n[cles[i]]) continue;
+      var v = varianteMoins(n[cles[i]]);
+      if (v) { var c = Object.assign({}, n); c[cles[i]] = Maths.analyser(v); c[cles[i]].parentheses = true; return versSrc(c); }
+    }
+    return null;
+  }
+  /** Variante « (a + b)² = a² + b² ». */
+  function varianteCarre(n) {
+    if (!n || typeof n !== 'object') return null;
+    if (n.type === '^' && n.exposant === 2 && estSomme(n.base)) {
+      return sommeDe(termesSomme(n.base).map(function (t) { return { signe: 1, noeud: { type: '^', base: Object.assign({}, t.noeud, { parentheses: true }), exposant: 2 } }; }));
+    }
+    var cles = ['g', 'd', 'arg', 'base'];
+    for (var i = 0; i < cles.length; i++) {
+      if (!n[cles[i]]) continue;
+      var v = varianteCarre(n[cles[i]]);
+      if (v) { var c = Object.assign({}, n); c[cles[i]] = Maths.analyser(v); c[cles[i]].parentheses = true; return versSrc(c); }
+    }
+    return null;
+  }
+  /** Diagnostic des erreurs typiques ; null si aucune n'est reconnue. */
+  function erreurTypique(reponse, r) {
+    var pr = polyOuNull(reponse), pa = polyOuNull(r.attendu);
+    if (r.depart) {
+      try {
+        var arbre = Maths.analyser(r.depart);
+        var vm = varianteMoins(arbre);
+        if (vm && !Maths.equivalentes(vm, r.attendu) && Maths.equivalentes(reponse, vm)) return 'Tu as oublié de distribuer le signe moins : un signe « – » devant une parenthèse change le signe de TOUS les termes de la parenthèse.';
+        var vc = varianteCarre(arbre);
+        if (vc && !Maths.equivalentes(vc, r.attendu) && Maths.equivalentes(reponse, vc)) return '(a + b)² n\'est pas a² + b² : il manque le double produit 2ab (voir l\'aide-mémoire, rubrique ' + RUBRIQUES.remarquables + ').';
+      } catch (e) { /* ignore */ }
+    }
+    if (pr && pa && pr.length < pa.length) {
+      var un = {};
+      P.lettres(pa.concat(pr)).forEach(function (l) { un[l] = 1; });
+      try {
+        if (P.valeur(pr, un).egal(P.valeur(pa, un))) return 'Tu as additionné des termes qui ne sont pas semblables : par exemple 3a + 2b ne se réduit pas (ce n\'est pas 5ab), et 4 + 5x² n\'est pas 9x². Seuls les monômes de même partie littérale s\'additionnent.';
+      } catch (e2) { /* ignore */ }
+    }
+    return null;
+  }
+
   /** Réponse = expression (équivalente à l'attendu, avec éventuellement une forme exigée). */
   function verifierExpr(q, texteBrut) {
     var r = q.reponse;
@@ -373,7 +453,7 @@
       return { juste: true, statut: 'juste', message: '' };
     }
     var p = chercherPiege(q.pieges, texte);
-    var diag = p || diagnosticPoly(texte, r.attendu);
+    var diag = p || erreurTypique(texte, r) || diagnosticPoly(texte, r.attendu);
     var ce = contreExemple(texte, r.depart || r.attendu);
     var msg = diag || 'Ta réponse n\'est pas égale au résultat attendu.';
     if (ce && !r.sansContreExemple) {
@@ -499,7 +579,9 @@
         msg += tn0(e0) + ' n\'est pas une solution. ';
       }
     }
-    if (manquants.length && !enTrop.length) msg += 'Il manque ' + (manquants.length > 1 ? 'des solutions' : 'une solution') + (r.valeurs.length === 2 ? ' : une équation du deuxième degré peut en avoir deux.' : '.');
+    var oppose = manquants.some(function (m) { return uniques.some(function (u) { return u.exact && m.exact && u.exact.egal(m.exact.oppose()); }); });
+    if (manquants.length && !enTrop.length && oppose) msg += 'Il manque la solution opposée : par exemple x² = 9 a deux solutions, 3 et – 3, car (– 3)² = 9 aussi.';
+    else if (manquants.length && !enTrop.length) msg += 'Il manque ' + (manquants.length > 1 ? 'des solutions' : 'une solution') + (r.valeurs.length === 2 ? ' : une équation du deuxième degré peut en avoir deux.' : '.');
     else if (manquants.length && enTrop.length && attendus.length > 1 && uniques.length < attendus.length) msg += 'Il manque aussi une solution.';
     return { juste: false, statut: 'faux', message: msg.trim() };
   }
@@ -745,7 +827,48 @@
     return melangerChoix(alea, opts);
   }
 
+  /* =====================================================================
+   * Exemples de référence de l'enseignante (non publics) : l'appli ne doit
+   * jamais les proposer, ni tels quels, ni avec d'autres lettres, ni avec les
+   * membres échangés ou réécrits (même polynôme g – d, au signe près).
+   * ===================================================================== */
+  var REFERENCES = [
+    '(3x-4)-(11)', '(4x-3)-(2x+1)', '(2x-3)(x+4)', '6a^2b-9ab', '4x^3y-16xy', 'x^2-5x+6', '2x+y-7', 'x-y-2'
+  ];
+  /** Signature d'un polynôme indépendante du nom des lettres et d'un facteur constant. */
+  function signature(p) {
+    if (!p || !p.length) return '';
+    var t = p.map(function (m) {
+      var ex = Object.keys(m.l).map(function (k) { return m.l[k]; }).sort();
+      return { c: m.c, ex: ex.join(',') };
+    }).sort(function (a, b) { return a.ex < b.ex ? -1 : a.ex > b.ex ? 1 : a.c.compare(b.c); });
+    var signe = t[t.length - 1].c.signe() < 0 ? -1 : 1; // au signe près (g – d ou d – g)
+    return t.map(function (x) { return x.ex + ':' + x.c.fois(signe).toString(); }).sort().join('|');
+  }
+  var SIGNATURES_REFERENCES = REFERENCES.map(function (r) { return signature(P.depuis(r)); });
+  /** Vrai si l'une des expressions (ou équations « g – d ») ressemble à un exemple de référence. */
+  function ressembleReference(sources) {
+    return sources.some(function (src) {
+      var p = polyOuNull(src);
+      return p && p.length && SIGNATURES_REFERENCES.indexOf(signature(p)) >= 0;
+    });
+  }
+  /** Expressions et équations d'une question (pour la comparaison aux références). */
+  function sourcesQuestion(q) {
+    var r = q.reponse || {}, c = q.controle || {}, s = [];
+    if (r.depart) s.push(r.depart);
+    if (r.type === 'expr' && r.attendu) s.push(r.attendu);
+    if (r.equation) s.push('(' + r.equation[0] + ')-(' + r.equation[1] + ')');
+    if (c.g && c.d) s.push('(' + c.g + ')-(' + c.d + ')');
+    if (c.eq) s.push('(' + c.eq[0] + ')-(' + c.eq[1] + ')');
+    if (c.equations) c.equations.forEach(function (e) { s.push('(' + e[0] + ')-(' + e[1] + ')'); });
+    if (c.expr) s.push(c.expr);
+    return s;
+  }
+
   return {
+    ressembleReference: ressembleReference,
+    sourcesQuestion: sourcesQuestion,
     Maths: Maths,
     P: P,
     F: F,

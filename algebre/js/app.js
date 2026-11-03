@@ -16,10 +16,10 @@
   var CLE_REGLAGES = 'revisions.algebre.reglages';
   var NIVEAUX_DIFFICULTE = { 1: 'Échauffement', 2: 'Standard', 3: 'Costaud', 4: 'Expert' };
   var DESCRIPTIONS_DIFFICULTE = ['',
-    'Peu de termes, coefficients positifs, une ou deux étapes.',
-    'Plus de termes, coefficients négatifs, deux ou trois étapes.',
-    'Parenthèses, plusieurs étapes, deux lettres.',
-    'Parenthèses imbriquées, fractions, solutions fractionnaires, cas particuliers.'];
+    'Exercices de base : une lettre, nombres positifs, une ou deux étapes.',
+    'Nombres négatifs, parenthèses simples, deux ou trois étapes.',
+    'Parenthèses, inconnue des deux côtés, trois ou quatre étapes.',
+    'Niveau de fin d\'année : les exercices les plus exigeants de ton année.'];
 
   var etat = { ecran: 'modules', module: null, difficulte: 2, choisis: null, serie: [], index: 0, resultats: [], repondu: false, clavier: null, visuel: null, choix: null };
 
@@ -153,7 +153,7 @@
     var texteDiff = el('p', { id: 'difficulte-texte', 'class': 'difficulte-texte' });
     function majDiff() {
       var d = Number(curseur.value);
-      texteDiff.textContent = 'Difficulté ' + d + ' sur 4 : ' + NIVEAUX_DIFFICULTE[d] + '. ' + DESCRIPTIONS_DIFFICULTE[d] + (profil.niveau === 2 ? ' (Au niveau 2, chaque difficulté va un cran plus loin.)' : '');
+      texteDiff.textContent = 'Difficulté ' + d + ' sur 4 : ' + NIVEAUX_DIFFICULTE[d] + '. ' + DESCRIPTIONS_DIFFICULTE[d] + (profil.niveau === 2 ? ' (Au niveau 2, des objectifs supplémentaires sont proposés.)' : '');
     }
     curseur.addEventListener('input', majDiff);
     majDiff();

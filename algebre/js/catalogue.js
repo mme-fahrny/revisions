@@ -5,8 +5,10 @@
  *
  *   Algebre.MODULES                         A (calcul littéral), B (équations)
  *   Algebre.objectifs                        tous les objectifs
- *   Algebre.palier(difficulte, niveau)       1 à 5 : difficulté du curseur (1 à 4),
- *                                            + 1 au niveau 2 (le niveau 2 va plus loin)
+ *   Algebre.difficulte(d)                    1 à 4 (curseur). Pas de décalage au niveau 2 :
+ *        le niveau 2 a des objectifs en plus, et chaque générateur lit ctx.niveau
+ *        là où le calibrage le prévoit (fractions, cas particuliers en niveau 2 seulement).
+ *        Chaque objectif est calibré selon les règles de SON année (révision comprise).
  *   Algebre.objectifsPour(module, profil)    objectifs disponibles, jamais au-delà de
  *        l'année et du niveau : statut 'courant' (année de l'élève) ou 'revision'
  *   Algebre.creerSerie(options)              10 questions
@@ -45,9 +47,8 @@
     valeur: 'Problème'
   };
 
-  function palier(difficulte, niveau) {
-    var d = Math.max(1, Math.min(4, Number(difficulte) || 1));
-    return d + (Number(niveau) === 2 ? 1 : 0);
+  function difficulte(d) {
+    return Math.max(1, Math.min(4, Number(d) || 1));
   }
 
   /** Objectifs disponibles : jamais au-delà de l'année et du niveau choisis. */
@@ -65,8 +66,12 @@
     return (courants.length ? courants : dispo).map(function (d) { return d.objectif.id; });
   }
 
-  function creerQuestion(o, alea, p, ctx, typesUtilises, strict) {
-    var modeles = o.modeles.filter(function (m) { return !m.palierMin || p >= m.palierMin; });
+  /** Une question de l'objectif o, à la difficulté d (1 à 4). ctx : { annee, niveau }. */
+  function creerQuestion(o, alea, d, ctx, typesUtilises, strict) {
+    var p = difficulte(d);
+    ctx = ctx || {};
+    var c2 = { annee: ctx.annee || o.annee, niveau: ctx.niveau || o.niveaux[0], difficulte: p, objectifAnnee: o.annee };
+    var modeles = o.modeles.filter(function (m) { return (!m.dMin || p >= m.dMin) && (!m.dMax || p <= m.dMax); });
     typesUtilises = typesUtilises || {};
     var min = Infinity;
     modeles.forEach(function (m) { min = Math.min(min, typesUtilises[m.type] || 0); });
@@ -74,7 +79,12 @@
     var modele = alea.choix(candidats);
     var q, essais = 0;
     for (;;) {
-      try { q = modele.gen(alea, p, ctx); break; } catch (e) {
+      try {
+        q = modele.gen(alea, p, c2);
+        // jamais un exemple de référence de l'enseignante (non public)
+        if (O.ressembleReference(O.sourcesQuestion(q)) && essais < 30) { essais++; continue; }
+        break;
+      } catch (e) {
         essais++;
         if (strict || essais > 8) throw e;
         modele = alea.choix(modeles);
@@ -83,7 +93,7 @@
     q.objectif = o.id;
     q.objectifTitre = o.titre;
     q.module = o.module;
-    q.palier = p;
+    q.difficulte = p;
     q.type = q.type || modele.type;
     q.typeTexte = TYPES[q.type] || '';
     typesUtilises[modele.type] = (typesUtilises[modele.type] || 0) + 1;
@@ -97,7 +107,7 @@
    */
   function creerSerie(options) {
     var profil = options.profil;
-    var p = palier(options.difficulte, profil.niveau);
+    var p = difficulte(options.difficulte);
     var dispo = objectifsPour(options.module, profil);
     var ids = options.objectifs && options.objectifs.length ? options.objectifs : selectionParDefaut(options.module, profil);
     var choisis = dispo.filter(function (d) { return ids.indexOf(d.objectif.id) >= 0; });
@@ -108,7 +118,7 @@
     while (ordre.length < n) ordre = ordre.concat(alea.melanger(choisis));
     ordre = ordre.slice(0, n);
     var typesUtilises = {};
-    var ctx = { annee: profil.annee, niveau: profil.niveau, palier: p };
+    var ctx = { annee: profil.annee, niveau: profil.niveau };
     return ordre.map(function (d, i) {
       var q = creerQuestion(d.objectif, alea, p, ctx, typesUtilises, options.strict);
       q.statut = d.statut;
@@ -123,7 +133,7 @@
     TYPES: TYPES,
     objectifs: objectifs,
     parId: parId,
-    palier: palier,
+    difficulte: difficulte,
     objectifsPour: objectifsPour,
     selectionParDefaut: selectionParDefaut,
     creerQuestion: creerQuestion,
