@@ -394,7 +394,7 @@
     { n: 100, egales: [['10²', '10^2'], ['√10\'000', '√10000']], fausses: [['10³', '10^3'], ['50²', '50^2'], ['2⁵⁰', '2^50']] },
     { n: 27, egales: [['3³', '3^3'], ['√729', '√729']], fausses: [['9³', '9^3'], ['3⁹', '3^9'], ['2⁷', '2^7']] },
     { n: 125, egales: [['5³', '5^3'], ['√15\'625', '√15625']], fausses: [['3⁵', '3^5'], ['25³', '25^3'], ['5²', '5^2']] },
-    { n: 8, egales: [['2³', '2^3'], ['√64', '√64'], ['∛512', '∛512']], fausses: [['3²', '3^2'], ['4²', '4^2'], ['√8', '√8']] },
+    { n: 8, egales: [['2³', '2^3'], ['√64', '√64'], ['∛512', '∛512']], fausses: [['3²', '3^2'], ['4²', '4^2'], ['√4', '√4']] },
     { n: 1000, egales: [['10³', '10^3'], ['√1\'000\'000', '√1000000']], fausses: [['10⁴', '10^4'], ['3¹⁰', '3^10'], ['100³', '100^3']] }
   ];
 
@@ -871,7 +871,7 @@
     function (alea) { var k = alea.entier(2, 12); return { h: '√' + (k * k) + ' = ' + H.moins + k, vrai: false, j: '√' + (k * k) + ' est le nombre positif dont le carré vaut ' + (k * k) + ' : √' + (k * k) + ' = ' + k + '.' }; },
     function (alea) { var k = alea.entier(2, 9); return { h: '√(' + H.moins + (k * k) + ') = ' + H.moins + k, vrai: false, j: 'un nombre négatif n\'a pas de racine carrée dans ℝ (un carré n\'est jamais négatif).' }; },
     function (alea) { var k = alea.entier(2, 6); return { h: '∛(' + H.moins + (k * k * k) + ') = ' + H.moins + k, vrai: true, j: 'la racine cubique d\'un nombre négatif existe : (– ' + k + ')³ = – ' + (k * k * k) + '.' }; },
-    function (alea) { var c = alea.choix([[9, 16], [36, 64], [25, 144], [16, 9], [4, 9], [36, 49]]); var s = Math.sqrt(c[0] + c[1]); return { h: '√' + c[0] + ' + √' + c[1] + ' = √' + (c[0] + c[1]), vrai: false, j: '√' + c[0] + ' + √' + c[1] + ' = ' + Math.sqrt(c[0]) + ' + ' + Math.sqrt(c[1]) + ' = ' + (Math.sqrt(c[0]) + Math.sqrt(c[1])) + (Number.isInteger(s) ? ', alors que √' + (c[0] + c[1]) + ' = ' + s : ', alors que √' + (c[0] + c[1]) + ' n\'est même pas un entier (' + (Math.floor(s)) + ' &lt; √' + (c[0] + c[1]) + ' &lt; ' + (Math.floor(s) + 1) + ')') + ' : √a + √b ≠ √(a + b).' }; },
+    function (alea) { var c = alea.choix([[9, 16], [36, 64], [25, 144], [16, 9], [81, 144], [64, 36]]); var s = Math.sqrt(c[0] + c[1]); return { h: '√' + c[0] + ' + √' + c[1] + ' = √' + (c[0] + c[1]), vrai: false, j: '√' + c[0] + ' + √' + c[1] + ' = ' + Math.sqrt(c[0]) + ' + ' + Math.sqrt(c[1]) + ' = ' + (Math.sqrt(c[0]) + Math.sqrt(c[1])) + (Number.isInteger(s) ? ', alors que √' + (c[0] + c[1]) + ' = ' + s : ', alors que √' + (c[0] + c[1]) + ' n\'est même pas un entier (' + (Math.floor(s)) + ' &lt; √' + (c[0] + c[1]) + ' &lt; ' + (Math.floor(s) + 1) + ')') + ' : √a + √b ≠ √(a + b).' }; },
     function (alea) { var a = alea.choix([4, 9, 16, 25]), b = alea.choix([4, 9, 16, 25, 36]); return { h: '√(' + a + ' · ' + b + ') = √' + a + ' · √' + b, vrai: true, j: '√(' + a + ' · ' + b + ') = √' + (a * b) + ' = ' + Math.sqrt(a * b) + ' et √' + a + ' · √' + b + ' = ' + Math.sqrt(a) + ' · ' + Math.sqrt(b) + ' = ' + (Math.sqrt(a) * Math.sqrt(b)) + '.' }; },
     function (alea) { var r = alea.entier(2, 12), k = r * r; return { h: '(√' + k + ')² = ' + k, vrai: true, j: 'par définition, le carré de √' + k + ' vaut ' + k + ' (√' + k + ' = ' + r + ' et ' + r + '² = ' + k + ').' }; }
   ];
