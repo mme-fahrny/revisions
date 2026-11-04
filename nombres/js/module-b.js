@@ -903,10 +903,14 @@
    * D3 : + même exposant (2³ · 5³) ; D4 : + exposants négatifs (si opts.negatifs).
    */
   function questionPropriete(alea, p, opts) {
-    var genres = [['produit'], ['produit', 'quotient', 'puissance'], ['produit', 'quotient', 'puissance', 'produitBases'], ['produit', 'quotient', 'puissance', 'produitBases']][p - 1];
+    opts = opts || {};
+    // niveau 1 (opts.simple) : une propriété de moins à chaque difficulté, pas de lettres
+    var genres = opts.simple
+      ? [['produit'], ['produit', 'quotient'], ['produit', 'quotient', 'puissance'], ['produit', 'quotient', 'puissance', 'produitBases']][p - 1]
+      : [['produit'], ['produit', 'quotient', 'puissance'], ['produit', 'quotient', 'puissance', 'produitBases'], ['produit', 'quotient', 'puissance', 'produitBases']][p - 1];
     if (opts && opts.negatifs && p >= 4) genres = genres.concat(['negatif', 'negatif']);
     var genre = alea.choix(genres);
-    var base = p >= 3 && alea.suivant() < 0.4 ? alea.choix(['a', 'x']) : alea.choix([2, 3, 5, 7, 10]);
+    var base = !opts.simple && p >= 3 && alea.suivant() < 0.4 ? alea.choix(['a', 'x']) : alea.choix([2, 3, 5, 7, 10]);
     var m1 = alea.entier(2, 7), n1 = alea.entier(2, 6);
     var h, exp, et, pieges, baseRep = base, b1 = 0, b2 = 0;
     if (genre === 'produit') {
@@ -1266,27 +1270,31 @@
    * 11e niveau 2 : racine n-ième, propriétés des racines
    * ===================================================================== */
 
-  function questionRacineN(alea, p) {
-    // D1-D2 : ⁴√16, ⁴√81, ⁵√32, ⁶√64 ; D3 : + ⁵√243, ⁴√256, ⁴√625, ⁷√128 ; D4 : + racines d'indice impair de nombres négatifs
-    var cas = alea.choix(p <= 2 ? [[2, 4], [3, 4], [2, 5], [2, 6]] : [[2, 4], [3, 4], [2, 5], [3, 5], [2, 6], [5, 4], [2, 7], [4, 4]]);
-    var b = cas[0], n = cas[1];
-    var neg = p >= 4 && n % 2 === 1 && alea.suivant() < 0.4;
-    var rad = Math.pow(b, n) * (neg ? -1 : 1);
-    var res = neg ? -b : b;
-    var rh = (neg ? '(' + H.moins + H.n(fr(-rad)) + ')' : H.n(fr(rad)));
-    return O.saisie({
+  /**
+   * 11e N2 : sens de la racine n-ième (questions théoriques, sans calcul à effectuer).
+   * « ⁿ√a = b » signifie « bⁿ = a ».
+   */
+  function questionSensRacineN(alea, p) {
+    var c = alea.choix(p <= 2 ? [[4, 81, 3], [4, 16, 2], [5, 32, 2], [6, 64, 2]] : [[4, 81, 3], [4, 16, 2], [5, 32, 2], [6, 64, 2], [4, 625, 5]]);
+    var n = c[0], a = c[1], b = c[2];
+    var h = '<sup>' + n + '</sup>√' + a + ' = ' + b;
+    var choix = [
+      { h: m(b + sup(n) + ' = ' + a), juste: true, cle: 'bon', message: '' },
+      { h: m(a + ' : ' + n + ' = ' + b), juste: false, cle: 'div', message: 'Prendre une racine n\'est pas diviser par l\'indice.' },
+      { h: m(n + sup(b) + ' = ' + a), juste: false, cle: 'inv', message: 'Attention à l\'ordre : c\'est ' + b + ' qui est élevé à la puissance ' + n + ' (l\'indice devient l\'exposant).' },
+      { h: m(b + ' · ' + n + ' = ' + a), juste: false, cle: 'mul', message: 'Une puissance n\'est pas un produit de la base par l\'exposant.' }
+    ];
+    return O.choix({
       type: 'directe',
-      enonce: '<p>Calcule :</p><p class="calcul">' + m('<sup>' + n + '</sup>√' + rh) + '</p>',
-      consigne: 'Écris un nombre entier.',
-      indice: 'Cherche le nombre dont la puissance ' + n + ' vaut ' + H.n(fr(rad)) + '.',
-      reponse: { type: 'valeur', valeur: fr(res), forme: 'entier' },
-      pieges: [{ valeur: fr(rad, n), message: 'Tu as divisé par l\'indice ' + n + ' : la racine ' + n + 'e de a est le nombre dont la puissance ' + n + ' vaut a.' }].concat(neg ? [{ valeur: fr(b), message: 'L\'indice est impair : la racine d\'un nombre négatif est négative.' }] : []),
-      etapes: O.etapes([['Je cherche le nombre dont la puissance ' + n + ' vaut ' + H.n(fr(rad)) + '.', m((res < 0 ? '(' + H.moins + b + ')' : b) + sup(n) + ' = ' + H.n(fr(rad)))], ['Donc :', m('<sup>' + n + '</sup>√' + rh + ' = ' + H.n(fr(res)))]]),
-      verification: 'Vérification : ' + m((res < 0 ? '(' + H.moins + b + ')' : b) + sup(n) + ' = ' + H.n(fr(rad))) + '. ✓',
+      enonce: '<p>Que signifie l\'égalité suivante ?</p><p class="calcul">' + m(h) + '</p>',
+      consigne: 'Choisis l\'égalité qui a le même sens.',
+      choix: choix,
+      indice: 'La racine carrée de a est le nombre dont le carré vaut a. De même pour la racine d\'indice ' + n + '.',
+      etapes: O.etapes([['<sup>n</sup>√a = b signifie que bⁿ = a : l\'indice de la racine devient l\'exposant.', m(h + ' parce que ' + b + sup(n) + ' = ' + a)]]),
       rubrique: R.racines,
-      nombres: [fr(rad)],
-      controle: { type: 'racineN', n: n, a: rad, res: res }
-    });
+      nombres: [fr(a)],
+      controle: { type: 'racineN', n: n, a: a, res: b, mesure: { ops: 1, etapes: 1 } }
+    }, alea);
   }
 
   function vraiFauxRacineN(alea, p) {
@@ -1472,7 +1480,8 @@
    * 11e niveau 2 (D4) : calcul combinant produits de racines et racine n-ième
    * ===================================================================== */
 
-  var RACINES_N = [[4, 16, 2], [4, 81, 3], [5, 32, 2], [3, 27, 3], [3, 64, 4], [6, 64, 2], [3, 125, 5]];
+  // racines cubiques seulement : la racine n-ième (n ⩾ 4) n'est pas appliquée en exercice
+  var RACINES_N = [[3, 8, 2], [3, 27, 3], [3, 64, 4], [3, 125, 5]];
 
   function questionCalculRacines(alea, p) {
     var r = alea.choix([2, 3, 5, 6]);
@@ -1605,11 +1614,10 @@
     },
     {
       id: 'B10-proprietes', module: 'B', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
-      plusLoinN1: [10],
       titre: 'Propriétés des puissances',
       modeles: [
-        { type: 'directe', gen: function (a, p, c) { return questionPropriete(a, p, { negatifs: neg(c, p) }); } },
-        { type: 'directe', gen: function (a, p, c) { return questionPropriete(a, p, { negatifs: neg(c, p) }); } },
+        { type: 'directe', gen: function (a, p, c) { return questionPropriete(a, p, { negatifs: neg(c, p), simple: c.annee === 10 && c.niveau === 1 }); } },
+        { type: 'directe', gen: function (a, p, c) { return questionPropriete(a, p, { negatifs: neg(c, p), simple: c.annee === 10 && c.niveau === 1 }); } },
         { type: 'vraifaux', gen: function (a, p, c) { return vraiFauxProprietes(a, p, { negatifs: neg(c, p) }); } },
         { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurProprietes(a, p); } }
       ]
@@ -1673,10 +1681,12 @@
     {
       // À VÉRIFIER : la racine n-ième n'a pas été confirmée dans le livre de 11e.
       id: 'B11-racine-n', module: 'B', annee: 11, niveaux: [2], theme: 'NO 11.1',
-      titre: 'Racine n-ième de nombres simples',
+      // Choix de l'enseignante : la racine n-ième doit être comprise, mais elle n'est pas
+      // appliquée en exercice. Seulement des questions sur son sens.
+      titre: 'Sens de la racine n-ième',
       bornesD: { nombre: [100, 100, 1000, 1000] },
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionRacineN(a, p); } },
+        { type: 'directe', gen: function (a, p) { return questionSensRacineN(a, p); } },
         { type: 'vraifaux', gen: function (a, p) { return vraiFauxRacineN(a, p); } }
       ]
     },

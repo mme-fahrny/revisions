@@ -227,7 +227,8 @@ function controler(q, ident) {
         return;
       }
       case 'racineN': {
-        verifierQue(new F(c.res).puissance(c.n).egal(new F(c.a)) && q.reponse.valeur.egal(new F(c.res)), 'racine n-ième fausse', ident);
+        // question de calcul : la réponse attendue vaut c.res ; question de sens (choix) : l'égalité c.res^n = c.a est vraie
+        verifierQue(new F(c.res).puissance(c.n).egal(new F(c.a)) && (!q.reponse.valeur || q.reponse.valeur.egal(new F(c.res))), 'racine n-ième fausse', ident);
         return;
       }
       case 'parentheses': {

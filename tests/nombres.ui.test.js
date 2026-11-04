@@ -166,8 +166,10 @@ async function serieComplete(page, module, contexte) {
   await p2.click('.profil-dialogue button[type=submit]');
   await p2.waitForSelector('[data-module="B"]');
   await p2.click('[data-module="B"]');
+  // les propriétés des puissances comptent dans le bilan dès le niveau 1 (choix de l'enseignante)
   var plusLoin = await p2.locator('.groupe-plusLoin').count();
-  verifier(plusLoin === 1, '« Pour aller plus loin » absent pour la 10e niveau 1 (propriétés des puissances)');
+  verifier(plusLoin === 0, 'groupe « Pour aller plus loin » inattendu en 10e niveau 1');
+  verifier(await p2.locator('text=Propriétés des puissances').count() === 1, 'propriétés des puissances absentes en 10e niveau 1');
   var n2 = await p2.locator('text=Racine n-ième').count();
   verifier(n2 === 0, 'objectif de niveau 2 proposé au niveau 1');
   verifier(err2.length === 0, 'erreurs sans profil : ' + err2.join(' | '));
