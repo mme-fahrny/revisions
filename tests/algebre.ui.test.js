@@ -393,6 +393,23 @@ async function ecranOutils(page, ctx, avecBalance) {
   await p2.click('[data-module="B"]');
   verifier(await p2.locator('#obj-B11-sys').count() === 0, 'systèmes (niveau 2) proposés au niveau 1');
   verifier(await p2.locator('#obj-B11-graph').count() === 1, 'résolution graphique absente en 11e niveau 1');
+  await p2.click('text=← Modules et outils');
+  await p2.click('[data-module="A"]');
+  verifier(await p2.locator('#obj-A11-fact').count() === 0, 'factorisation (niveau 2) proposée au niveau 1');
+  verifier(await p2.locator('.groupe-plusLoin #obj-A11-mev').count() === 1, 'mise en évidence absente de « Pour aller plus loin » en 11e N1');
+  verifier(!(await p2.isChecked('#obj-A11-mev')), '« Pour aller plus loin » coché par défaut');
+  // série avec la seule mise en évidence : questions non comptées dans le bilan
+  await p2.click('text=Tout décocher');
+  await p2.check('#obj-A11-mev');
+  await p2.click('#commencer');
+  for (var k2 = 0; k2 < 10; k2++) {
+    await p2.waitForSelector('#verifier');
+    verifier(await p2.locator('.etiquette-plus-loin').count() === 1, 'étiquette « Pour aller plus loin » absente');
+    await repondre(p2, true, '360px-11e-N1 plus loin');
+    await p2.click('#suivant');
+  }
+  await p2.waitForSelector('.table-bilan');
+  verifier(/facultatif.*10 \/ 10.*non compté/.test((await p2.textContent('.score')).trim()) && /non compté/.test(await p2.textContent('.table-bilan')), 'bilan : questions « plus loin » comptées : ' + await p2.textContent('.score'));
   verifier(err2.length === 0, 'erreurs sans profil : ' + err2.join(' | '));
   await ctx2.close();
 

@@ -346,7 +346,7 @@ var ETAPES_MAX = { 1: 2, 2: 3, 3: 4, 4: 5 };
 var TERMES_MAX = { 9: { 1: 2, 2: 3, 3: 4, 4: 4 }, 10: { 1: 3, 2: 4, 3: 5, 4: 6 } };
 // objectifs dont les nombres viennent d'un contexte (prix, longueurs…) : pas de borne sur les coefficients
 // et formes développées à factoriser (les coefficients y sont des produits)
-var CONTEXTE = /pb|geo|expr|sys|deg2|graph|form|preuve|fact|rem/;
+var CONTEXTE = /pb|geo|expr|sys|deg2|graph|form|preuve|fact|mev|rem/;
 
 function sourcesDepart(q) {
   var r = q.reponse, c = q.controle || {}, s = [];
@@ -442,7 +442,8 @@ function controlerBornes(q, ident, d, niveau, anneeObjectif) {
   }
   // contenus réservés à une difficulté
   if (id === 'A11-fact' && d <= 2) verifierQue(!r.nbFacteurs, 'facteur commun polynôme avant D3', ident);
-  if (id === 'A11-fact' && d === 1 && r.attendu) verifierQue(/^\d+\(/.test(r.attendu), 'D1 : facteur numérique seul attendu', ident + ' ' + r.attendu);
+  if (id === 'A11-mev' && r.type === 'expr') verifierQue(!r.nbFacteurs && /^-?\d*[a-z^0-9]*\([^()]*\)$/.test(r.attendu.replace(/\s/g, '')), 'mise en évidence : un monôme devant UNE parenthèse attendu', ident + ' ' + r.attendu);
+  if (/A11-(fact|mev)/.test(id) && d === 1 && r.attendu) verifierQue(/^\d+\(/.test(r.attendu), 'D1 : facteur numérique seul attendu', ident + ' ' + r.attendu);
   if (id === 'A11-rem' && r.forme === 'factorisee') verifierQue(d >= 3, 'factorisation par identité avant D3', ident);
   if (id === 'A11-rem' && d <= 3 && r.forme === 'factorisee') verifierQue(/\)\(/.test(r.attendu) && !/\^2/.test(r.attendu), 'D3 : seulement a² – b²', ident + ' ' + r.attendu);
   if (/A10-mul|A11-op|A10-expr|A11-pb/.test(id) && r.depart && /\)\(/.test(r.depart)) {
@@ -535,6 +536,8 @@ var debut = Date.now();
             var ident = cle + ' ' + q.objectif + ' (' + q.type + ')';
             var o = Algebre.parId[q.objectif];
             verifierQue(o.niveaux.indexOf(niveau) >= 0 && o.annee <= annee, 'objectif hors profil dans une série', ident);
+            var plusLoin = niveau === 1 && (o.plusLoinN1 || []).indexOf(annee) >= 0;
+            verifierQue(q.compte === !plusLoin && (q.statut === 'plusLoin') === plusLoin, '« pour aller plus loin » mal compté', ident);
             verifierQue(q.difficulte === diff, 'difficulté incorrecte', ident);
             try { controlerBornes(q, ident, diff, niveau, o.annee); } catch (e) { echec('exception dans le contrôle des bornes', ident + ' : ' + e.stack.split('\n').slice(0, 2).join(' | ')); }
             try { controler(q, ident); } catch (e) { echec('exception dans le contrôle', ident + ' : ' + e.stack.split('\n').slice(0, 2).join(' | ')); }
@@ -561,6 +564,17 @@ var debut = Date.now();
     });
   });
 });
+
+/* ---------- factorisation : niveau 2 ; mise en évidence d'un monôme « pour aller plus loin » en 11e N1 ---------- */
+(function () {
+  var n1 = Algebre.objectifsPour('A', { annee: 11, niveau: 1 }), n2 = Algebre.objectifsPour('A', { annee: 11, niveau: 2 });
+  function statut(liste, id) { var d = liste.filter(function (x) { return x.objectif.id === id; })[0]; return d ? d.statut : null; }
+  verifierQue(statut(n1, 'A11-fact') === null, 'factorisation proposée au niveau 1', '');
+  verifierQue(statut(n1, 'A11-mev') === 'plusLoin', 'mise en évidence non proposée « pour aller plus loin » en 11e N1', statut(n1, 'A11-mev'));
+  verifierQue(statut(n2, 'A11-fact') === 'courant' && statut(n2, 'A11-mev') === null, 'factorisation de 11e N2', '');
+  verifierQue(Algebre.selectionParDefaut('A', { annee: 11, niveau: 1 }).indexOf('A11-mev') < 0, '« pour aller plus loin » coché par défaut', '');
+  verifierQue(statut(Algebre.objectifsPour('A', { annee: 10, niveau: 1 }), 'A11-mev') === null, 'mise en évidence proposée en 10e', '');
+})();
 
 /* ---------- tests ciblés de la vérification ---------- */
 function q(reponse, extra) { var o = { reponse: reponse }; for (var k in extra || {}) o[k] = extra[k]; return O.finaliser(o); }

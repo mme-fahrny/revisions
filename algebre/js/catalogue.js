@@ -10,7 +10,9 @@
  *        là où le calibrage le prévoit (fractions, cas particuliers en niveau 2 seulement).
  *        Chaque objectif est calibré selon les règles de SON année (révision comprise).
  *   Algebre.objectifsPour(module, profil)    objectifs disponibles, jamais au-delà de
- *        l'année et du niveau : statut 'courant' (année de l'élève) ou 'revision'
+ *        l'année et du niveau : statut 'courant' (année de l'élève), 'revision',
+ *        ou 'plusLoin' (objectif facultatif du niveau 1, non compté dans le bilan :
+ *        champ plusLoinN1 = années concernées)
  *   Algebre.creerSerie(options)              10 questions
  */
 (function (racine, fabrique) {
@@ -56,14 +58,16 @@
     return objectifs.filter(function (o) {
       return (!module || o.module === module) && o.annee <= profil.annee && o.niveaux.indexOf(profil.niveau) >= 0;
     }).map(function (o) {
-      return { objectif: o, statut: o.annee === profil.annee ? 'courant' : 'revision' };
+      var plusLoin = profil.niveau === 1 && (o.plusLoinN1 || []).indexOf(profil.annee) >= 0;
+      return { objectif: o, statut: plusLoin ? 'plusLoin' : (o.annee === profil.annee ? 'courant' : 'revision') };
     });
   }
 
   function selectionParDefaut(module, profil) {
     var dispo = objectifsPour(module, profil);
     var courants = dispo.filter(function (d) { return d.statut === 'courant'; });
-    return (courants.length ? courants : dispo).map(function (d) { return d.objectif.id; });
+    var revision = dispo.filter(function (d) { return d.statut === 'revision'; });
+    return (courants.length ? courants : revision).map(function (d) { return d.objectif.id; });
   }
 
   /** Une question de l'objectif o, à la difficulté d (1 à 4). ctx : { annee, niveau }. */
@@ -122,7 +126,7 @@
     return ordre.map(function (d, i) {
       var q = creerQuestion(d.objectif, alea, p, ctx, typesUtilises, options.strict);
       q.statut = d.statut;
-      q.compte = true;
+      q.compte = d.statut !== 'plusLoin';
       q.numero = i + 1;
       return q;
     });

@@ -130,7 +130,8 @@
     r.appendChild(el('p', {}, [el('button', { type: 'button', 'class': 'bouton-discret', texte: '← Modules et outils', onclick: ecranModules })]));
     r.appendChild(el('h2', { texte: 'Module ' + m.id + ' – ' + m.titre }));
     var form = el('form', { 'class': 'reglages', novalidate: 'novalidate' });
-    [{ statut: 'courant', titre: 'Objectifs de ta ' + profil.annee + 'e (niveau ' + profil.niveau + ')' }, { statut: 'revision', titre: 'Révision des années précédentes' }].forEach(function (g) {
+    [{ statut: 'courant', titre: 'Objectifs de ta ' + profil.annee + 'e (niveau ' + profil.niveau + ')' }, { statut: 'revision', titre: 'Révision des années précédentes' },
+      { statut: 'plusLoin', titre: 'Pour aller plus loin (entraînement facultatif, non compté dans le bilan)' }].forEach(function (g) {
       var items = dispo.filter(function (d) { return d.statut === g.statut; });
       if (!items.length) return;
       var fs = el('fieldset', { 'class': 'groupe-objectifs groupe-' + g.statut }, [el('legend', { texte: g.titre })]);
@@ -197,7 +198,8 @@
     r.appendChild(el('p', { 'class': 'etiquettes' }, [
       el('span', { 'class': 'etiquette', texte: q.typeTexte }),
       el('span', { 'class': 'etiquette etiquette-objectif', texte: q.objectifTitre }),
-      q.statut === 'revision' ? el('span', { 'class': 'etiquette', texte: 'Révision' }) : null
+      q.statut === 'revision' ? el('span', { 'class': 'etiquette', texte: 'Révision' }) : null,
+      q.statut === 'plusLoin' ? el('span', { 'class': 'etiquette etiquette-plus-loin', texte: 'Pour aller plus loin (non compté)' }) : null
     ]));
     var carte = el('section', { 'class': 'question', 'aria-labelledby': 'titre-question' });
     carte.appendChild(el('h2', { id: 'titre-question', 'class': 'visuellement-cache', texte: 'Question ' + (etat.index + 1) }));
@@ -267,7 +269,7 @@
     }
     etat.repondu = true;
     etat.resultats.push({ q: q, juste: res.juste, statut: res.statut });
-    enregistrerResultat(q.objectif, res.juste);
+    enregistrerResultat(q.compte === false ? q.objectif + ' (plus loin)' : q.objectif, res.juste);
     if (etat.clavier) etat.clavier.element.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
     var champ = $('#reponse'); if (champ) champ.readOnly = true;
     racine().querySelectorAll('.choix-reponses input').forEach(function (b) { b.disabled = true; });
@@ -317,13 +319,18 @@
   function ecranBilan() {
     etat.ecran = 'bilan';
     var r = vider();
-    var reussis = etat.resultats.filter(function (x) { return x.juste; }).length;
+    var comptes = etat.resultats.filter(function (x) { return x.q.compte !== false; });
+    var reussis = comptes.filter(function (x) { return x.juste; }).length;
     r.appendChild(el('h2', { texte: 'Bilan de la série' }));
-    r.appendChild(el('p', { 'class': 'score' }, [el('strong', { texte: reussis + ' / ' + etat.resultats.length }), ' réponse' + (reussis > 1 ? 's' : '') + ' juste' + (reussis > 1 ? 's' : '') + '.']));
+    if (comptes.length) r.appendChild(el('p', { 'class': 'score' }, [el('strong', { texte: reussis + ' / ' + comptes.length }), ' réponse' + (reussis > 1 ? 's' : '') + ' juste' + (reussis > 1 ? 's' : '') + (comptes.length < etat.resultats.length ? ' (sans les questions « Pour aller plus loin »)' : '') + '.']));
+    else {
+      var libres = etat.resultats.filter(function (x) { return x.juste; }).length;
+      r.appendChild(el('p', { 'class': 'score' }, ['Entraînement facultatif « Pour aller plus loin » : ', el('strong', { texte: libres + ' / ' + etat.resultats.length }), ' (non compté dans le bilan).']));
+    }
     var parObj = {};
     etat.resultats.forEach(function (x) {
       var k = x.q.objectif;
-      if (!parObj[k]) parObj[k] = { titre: x.q.objectifTitre, n: 0, j: 0 };
+      if (!parObj[k]) parObj[k] = { titre: x.q.objectifTitre, n: 0, j: 0, compte: x.q.compte !== false };
       parObj[k].n++; if (x.juste) parObj[k].j++;
     });
     var table = el('table', { 'class': 'table-bilan' });
@@ -332,12 +339,12 @@
     var tb = el('tbody');
     Object.keys(parObj).forEach(function (k) {
       var o = parObj[k];
-      tb.appendChild(el('tr', { 'class': o.j === o.n ? 'bilan-ok' : o.j === 0 ? 'bilan-ko' : 'bilan-moyen' }, [el('td', { texte: o.titre }), el('td', { 'class': 'nombre-bilan', texte: o.j + ' / ' + o.n })]));
+      tb.appendChild(el('tr', { 'class': o.j === o.n ? 'bilan-ok' : o.j === 0 ? 'bilan-ko' : 'bilan-moyen' }, [el('td', {}, [o.titre, o.compte ? null : el('span', { 'class': 'etiquette etiquette-plus-loin', texte: 'non compté' })]), el('td', { 'class': 'nombre-bilan', texte: o.j + ' / ' + o.n })]));
     });
     table.appendChild(tb);
     r.appendChild(el('div', { 'class': 'table-defilante' }, [table]));
     var ratees = etat.resultats.filter(function (x) { return !x.juste; }).map(function (x) { return x.q; });
-    var conseil = reussis === etat.resultats.length && reussis ? 'Bravo ! Tu peux augmenter la difficulté.' : (ratees.length ? 'Relis la correction des questions ratées, puis refais-les.' : '');
+    var conseil = reussis === comptes.length && reussis ? 'Bravo ! Tu peux augmenter la difficulté.' : (ratees.length ? 'Relis la correction des questions ratées, puis refais-les.' : '');
     if (conseil) r.appendChild(el('p', { texte: conseil }));
     var actions = el('div', { 'class': 'actions' });
     if (ratees.length) actions.appendChild(el('button', { type: 'button', 'class': 'bouton', id: 'refaire', texte: 'Refaire les questions ratées (' + ratees.length + ')', onclick: function () { demarrerSerie(ratees); } }));
