@@ -156,8 +156,8 @@
     function majDiff() {
       var d = Number(curseur.value);
       texteDiff.textContent = 'Difficulté ' + d + ' sur 4 : ' + NIVEAUX_DIFFICULTE[d] + '. ' +
-        ['', 'Petits nombres, une seule étape.', 'Nombres plus grands, parfois deux étapes.', 'Plusieurs étapes, nombres négatifs, pièges.', 'Calculs longs, pièges fréquents.'][d] +
-        (profil.niveau === 2 ? ' (Au niveau 2, chaque difficulté va un cran plus loin.)' : '');
+        ['', 'Exercices de base : petits nombres, une seule opération.', 'Deux étapes, nombres jusqu\'à 100.', 'Deux à trois étapes, ppmc ou pgdc à trouver.', 'Le plus exigeant du niveau : trois étapes au plus, problèmes en contexte.'][d] +
+        (profil.niveau === 2 ? ' (Au niveau 2, certaines questions vont plus loin, surtout en difficulté 4.)' : '');
     }
     curseur.addEventListener('input', majDiff);
     majDiff();

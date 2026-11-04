@@ -311,8 +311,9 @@
       h = facteurs.map(rel).join(' · ');
       texte = facteurs.map(function (f) { return '(' + f.toString() + ')'; }).join('*');
     } else {
-      var q = fr(alea.entierNonNul(-12, 12)), d = fr(alea.entierNonNul(-12, 12));
-      if (d.egal(1)) d = fr(-3);
+      // dividende ⩽ la limite de la difficulté (20, 100, 200, 300)
+      var q, d, lim = [0, 20, 100, 200, 300][p], essai = 0;
+      do { q = fr(alea.entierNonNul(-12, 12)); d = fr(alea.entierNonNul(-12, 12)); if (d.egal(1)) d = fr(-3); essai++; } while (Math.abs(q.valeur() * d.valeur()) > lim && essai < 200);
       facteurs = [q.fois(d), d];
       v = q;
       h = rel(facteurs[0]) + ' : ' + rel(d);
@@ -362,7 +363,8 @@
       etapes: O.etapes([['Je compte les facteurs négatifs : ' + negatifs + ' (' + (negatifs % 2 === 0 ? 'pair' : 'impair') + ').', ''], ['Le produit est donc ' + (negatifs % 2 === 0 ? 'positif' : 'négatif') + ' : il vaut ' + H.n(prod) + '.', '']]),
       rubrique: R.mulRelatifs,
       nombres: facteurs,
-      controle: { type: 'vf', a: texte, b: '0', relation: annonce === 'positif' ? '>' : '<' }
+      // on ne calcule pas : on compte les facteurs négatifs (une seule étape)
+      controle: { type: 'vf', a: texte, b: '0', relation: annonce === 'positif' ? '>' : '<', mesure: { ops: 1, etapes: 1 } }
     }, alea);
   }
 
@@ -402,22 +404,42 @@
    * 10e : priorités et parenthèses inutiles
    * ===================================================================== */
 
-  function questionPrioritesRelatifs(alea, p, ctx) {
+  /**
+   * Priorités avec des relatifs. Deux opérations dès D1 (exception validée pour les priorités),
+   * trois en D3-D4 ; puissance d'un relatif seulement si opts.puissances (10e N2 D4, 11e N2).
+   */
+  function questionPrioritesRelatifs(alea, p, ctx, opts) {
+    opts = opts || {};
     var t, v, essais = 0;
+    var lim = [0, 20, 100, 200, 300][p];
+    var f = p <= 1 ? 5 : 9;
     function e(max) { return A.f(alea.entierNonNul(-max, max)); }
+    var modeles = p <= 2 ? ['a+b·c', 'a·(b–c)', 'a–b:c', 'a·b+c'] : ['(a+b)·(c–d)', 'a·b–c·d', 'a–b·(c+d)', 'a·(b–c)+d'];
+    if (opts.puissances) modeles = ['a+b·c²', '(–a)³–b·c', 'a–(–b)²'];
     do {
-      var mod = alea.choix(['a+b·c', 'a·(b–c)', 'a–b:c', '(a+b)·(c–d)', 'a·b–c·d', 'a+b·c²']);
+      var mod = alea.choix(modeles);
       switch (mod) {
-        case 'a+b·c': t = A.o('+', e(20), A.o('·', e(9), e(9))); break;
-        case 'a·(b–c)': t = A.o('·', e(9), A.par(A.o('–', e(12), e(12)))); break;
-        case 'a–b:c': { var c = e(6), q = alea.entierNonNul(-9, 9); t = A.o('–', e(20), A.o(':', A.f(c.v.fois(q)), c)); break; }
+        case 'a+b·c': t = A.o('+', e(Math.min(20, lim)), A.o('·', e(f), e(f))); break;
+        case 'a·b+c': t = A.o('+', A.o('·', e(f), e(f)), e(Math.min(20, lim))); break;
+        case 'a·(b–c)': t = A.o('·', e(f), A.par(A.o('–', e(12), e(12)))); break;
+        case 'a–b:c': { var c = e(p <= 1 ? 4 : 6), q = alea.entierNonNul(p <= 1 ? -5 : -9, p <= 1 ? 5 : 9); t = A.o('–', e(Math.min(20, lim)), A.o(':', A.f(c.v.fois(q)), c)); break; }
         case '(a+b)·(c–d)': t = A.o('·', A.par(A.o('+', e(9), e(9))), A.par(A.o('–', e(9), e(9)))); break;
         case 'a·b–c·d': t = A.o('–', A.o('·', e(9), e(9)), A.o('·', e(9), e(9))); break;
-        default: t = A.o('+', e(20), A.o('·', e(5), A.p(e(4), 2)));
+        case 'a–b·(c+d)': t = A.o('–', e(20), A.o('·', e(9), A.par(A.o('+', e(9), e(9))))); break;
+        case 'a·(b–c)+d': t = A.o('+', A.o('·', e(9), A.par(A.o('–', e(9), e(9)))), e(20)); break;
+        case 'a+b·c²': t = A.o('+', e(20), A.o('·', e(5), A.p(e(4), 2))); break;
+        case '(–a)³–b·c': t = A.o('–', A.p(A.f(-alea.entier(2, 4)), 3), A.o('·', e(9), e(9))); break;
+        default: t = A.o('–', e(20), A.p(A.f(-alea.entier(2, 6)), 2));
+      }
+      // erreur ciblée : (– 3)² calculé comme – 9 (le signe sorti de la puissance)
+      var piegePuissance = null;
+      if (mod === 'a–(–b)²') {
+        var bb = t.d.g.v;
+        piegePuissance = { valeur: t.g.v.plus(bb.puissance(2)), message: 'Attention : (' + H.moins + H.n(bb.abs()) + ')² = ' + H.n(bb.puissance(2)) + ' (deux facteurs négatifs : résultat positif), et non ' + H.moins + H.n(bb.puissance(2)) + '.' };
       }
       v = A.valeur(t);
       essais++;
-    } while (v.abs().compare(200) > 0 && essais < 30);
+    } while ((v.abs().compare(200) > 0 || A.feuilles(t).some(function (x) { return x.abs().compare(lim) > 0; })) && essais < 60);
     var naif = A.naif(t);
     var h = A.html(t);
     return O.saisie({
@@ -427,7 +449,7 @@
       barreOblique: 'division',
       indice: 'D\'abord les parenthèses, puis les puissances, puis · et :, enfin + et –. Attention aux signes.',
       reponse: { type: 'valeur', valeur: v },
-      pieges: naif && !naif.egal(v) ? [{ valeur: naif, message: 'Tu as calculé de gauche à droite sans respecter les priorités.' }, { valeur: v.oppose(), message: 'Attention aux signes (règle des signes pour · et :).' }] : [{ valeur: v.oppose(), message: 'Attention aux signes.' }],
+      pieges: (piegePuissance ? [piegePuissance] : []).concat(naif && !naif.egal(v) ? [{ valeur: naif, message: 'Tu as calculé de gauche à droite sans respecter les priorités.' }, { valeur: v.oppose(), message: 'Attention aux signes (règle des signes pour · et :).' }] : [{ valeur: v.oppose(), message: 'Attention aux signes.' }]),
       etapes: O.etapes(A.etapes(t).map(function (e2, i) { return [e2[0], m((i === 0 ? h + ' ' : '') + e2[1])]; })),
       verification: 'Vérification : refais le calcul en notant le signe de chaque résultat intermédiaire.',
       rubrique: R.priorites,
@@ -443,7 +465,7 @@
       { h: a + ' + (' + b + ' · ' + c + ')', avec: a + '+(' + b + '*' + c + ')', sans: a + '+' + b + '*' + c },
       { h: '(' + a + ' + ' + b + ') · ' + c, avec: '(' + a + '+' + b + ')*' + c, sans: a + '+' + b + '*' + c },
       { h: a + ' – (' + b + ' + ' + c + ')', avec: a + '-(' + b + '+' + c + ')', sans: a + '-' + b + '+' + c },
-      { h: '(' + H.moins + a + ')²', avec: '(-' + a + ')^2', sans: '-' + a + '^2' },
+      { h: a + ' – (' + b + ' – ' + c + ')', avec: a + '-(' + b + '-' + c + ')', sans: a + '-' + b + '-' + c },
       { h: '(' + a + ' · ' + b + ') : ' + c, avec: '(' + a + '*' + b + '):' + c, sans: a + '*' + b + ':' + c },
       { h: a + ' : (' + b + ' · ' + c + ')', avec: a + ':(' + b + '*' + c + ')', sans: a + ':' + b + '*' + c }
     ]);
@@ -472,7 +494,7 @@
    * ===================================================================== */
 
   function problemeRelatifs(alea, p) {
-    var modele = alea.choix(['temperature', 'plongeur', 'ascenseur', 'compte']);
+    var modele = alea.choix(p <= 1 ? ['temperature', 'plongeur'] : ['temperature', 'plongeur', 'ascenseur', 'compte']);
     var enonce, question, res, et, unite, expr, nombres, pieges = [];
     if (modele === 'temperature') {
       var t1 = alea.entier(-18, -3), t2 = alea.entier(-2, 12);
@@ -485,7 +507,7 @@
       pieges.push({ valeur: fr(t2 + t1), message: 'Tu as additionné les températures. L\'écart se calcule avec une soustraction : ' + t2 + ' – (' + t1 + ').' });
       pieges.push({ valeur: fr(Math.abs(t2) - Math.abs(t1)).abs(), message: 'Soustraire un nombre négatif, c\'est additionner son opposé.' });
     } else if (modele === 'plongeur') {
-      var prof = alea.entier(8, 30), remonte = alea.entier(2, prof - 1);
+      var prof = alea.entier(8, p <= 1 ? 20 : 30), remonte = alea.entier(2, prof - 1);
       res = fr(-prof + remonte);
       enonce = '<p>Un plongeur se trouve à ' + prof + ' m sous la surface du lac de Neuchâtel (altitude relative ' + H.n(fr(-prof)) + ' m). Il remonte de ' + remonte + ' m.</p>';
       question = 'À quelle altitude relative se trouve-t-il maintenant ?';
@@ -532,14 +554,88 @@
   }
 
   /* =====================================================================
+   * Parenthèse précédée du signe – (erreur fréquente : oublier de changer les signes)
+   * ===================================================================== */
+
+  function questionParentheseMoins(alea, p) {
+    var lim = [0, 20, 100, 200, 300][p];
+    var a, b, c, op, essai = 0;
+    do {
+      a = alea.entierNonNul(-Math.min(20, lim), Math.min(20, lim)); b = alea.entierNonNul(-12, 12); c = alea.entierNonNul(1, 12);
+      op = alea.choix(['+', '–']);
+      essai++;
+    } while ((op === '+' ? b + c : b - c) === 0 && essai < 50);
+    var inter = op === '+' ? b + c : b - c;
+    var v = a - inter;
+    var faux = op === '+' ? a - b + c : a - b - c; // signe du second terme non changé
+    var h = simp(fr(a)) + ' – (' + simp(fr(b)) + ' ' + op + ' ' + c + ')';
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Calcule :</p><p class="calcul">' + m(h) + '</p>',
+      consigne: 'Écris le résultat (avec son signe s\'il est négatif).',
+      indice: 'La parenthèse est précédée du signe – : calcule d\'abord la parenthèse, ou supprime-la en changeant le signe de chaque terme qu\'elle contient.',
+      reponse: { type: 'valeur', valeur: fr(v) },
+      pieges: faux === v ? [] : [{ valeur: fr(faux), message: 'Tu as supprimé la parenthèse précédée du signe – sans changer le signe de tous ses termes : ' + H.moins + '(' + simp(fr(b)) + ' ' + op + ' ' + c + ') = ' + simp(fr(-b)) + ' ' + (op === '+' ? '–' : '+') + ' ' + c + '.' }],
+      etapes: O.etapes([
+        ['Je calcule d\'abord la parenthèse.', m(simp(fr(b)) + ' ' + op + ' ' + c + ' = ' + simp(fr(inter)))],
+        ['Soustraire un nombre, c\'est additionner son opposé.', m(simp(fr(a)) + ' – ' + rel(fr(inter)) + ' = ' + simp(fr(a)) + ' + ' + rel(fr(-inter)) + ' = ' + simp(fr(v)))]
+      ]),
+      verification: 'Autre méthode : on supprime la parenthèse en changeant les signes : ' + m(simp(fr(a)) + ' ' + (b > 0 ? '– ' + b : '+ ' + (-b)) + ' ' + (op === '+' ? '– ' : '+ ') + c + ' = ' + simp(fr(v))) + '. ✓',
+      rubrique: R.addRelatifs,
+      nombres: [fr(a), fr(b), fr(c)],
+      controle: { expr: '(' + a + ')-((' + b + ')' + (op === '+' ? '+' : '-') + c + ')' },
+      attenduHtml: H.n(fr(v))
+    });
+  }
+
+  /* =====================================================================
+   * 11e : relatifs, fractions (et racines au niveau 2) mêlés
+   * ===================================================================== */
+
+  function questionMelange11(alea, p, ctx) {
+    if (p <= 3) return questionPrioritesRelatifs(alea, p, ctx);
+    var t, v, essai = 0;
+    var racines = ctx && ctx.niveau === 2;
+    do {
+      var b = alea.choix([2, 3, 4, 5]);
+      var fra = A.f(fr(alea.entierNonNul(-4, 4), b));
+      var ent = A.f(fr(b * alea.entierNonNul(-3, 3)));
+      var deuxieme = racines ? A.r(A.f(alea.choix([4, 9, 16, 25, 36, 49]))) : A.f(alea.entierNonNul(-9, 9));
+      t = A.o('–', A.o('+', A.o('·', fra, ent), deuxieme), A.f(alea.entierNonNul(-9, 9)));
+      v = A.valeur(t);
+      essai++;
+    } while ((!v.estEntier() || fra.v.estEntier()) && essai < 100);
+    var h = A.html(t);
+    var naif = A.naif(t);
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Calcule en respectant les priorités des opérations :</p><p class="calcul">' + m(h) + '</p>',
+      consigne: 'Écris le résultat.',
+      barreOblique: 'fraction',
+      clavier: racines ? 'complet' : 'nombres',
+      indice: 'D\'abord les racines, puis la multiplication (règle des signes), enfin les additions et soustractions de gauche à droite.',
+      reponse: { type: 'valeur', valeur: v },
+      pieges: [{ valeur: v.oppose(), message: 'Attention aux signes.' }].concat(naif && !naif.egal(v) ? [{ valeur: naif, message: 'Tu as calculé de gauche à droite sans respecter les priorités.' }] : []),
+      etapes: O.etapes(A.etapes(t).map(function (e2, i) { return [e2[0], m((i === 0 ? h + ' ' : '') + e2[1])]; })),
+      verification: 'Vérification : refais le calcul en notant le signe de chaque résultat intermédiaire.',
+      rubrique: R.priorites,
+      nombres: A.feuilles(t),
+      controle: { expr: A.texte(t) },
+      attenduHtml: H.n(v)
+    });
+  }
+
+  /* =====================================================================
    * Catalogue
    * ===================================================================== */
+
+  // Priorités : deux opérations dès D1 (exception validée par l'enseignante).
+  var BORNES_PRIORITES = { operations: [2, 3, 4, 4], etapes: [2, 2, 3, 3] };
 
   var objectifs = [
     {
       id: 'C9-droite', module: 'C', annee: 9, niveaux: [1, 2], theme: 'NO 9.2',
       titre: 'Associer un point de la droite numérique à un nombre relatif',
-      bornes: { max: [10, 10, 10, 10, 10], den: [1, 2, 4, 10, 5] },
       modeles: [
         { type: 'visuel', gen: function (a, p) { return questionLireDroite(a, p); } },
         { type: 'visuel', gen: function (a, p) { return questionPlacerDroite(a, p); } }
@@ -548,18 +644,16 @@
     {
       id: 'C9-comparer', module: 'C', annee: 9, niveaux: [1, 2], theme: 'NO 9.2',
       titre: 'Comparer, ordonner, encadrer des nombres relatifs et décimaux',
-      bornes: { max: [25, 25, 25, 25, 25], den: [1000, 1000, 1000, 1000, 1000] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionOrdonnerRelatifs(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionEncadrerRelatif(a, p); } },
-        { type: 'directe', gen: function (a, p) { return A9.questionComparerDecimaux(a, Math.max(4, p), { relatifs: true }); } },
+        { type: 'directe', gen: function (a, p) { return A9.questionComparerDecimaux(a, p, { relatifs: true }); } },
         { type: 'vraifaux', gen: function (a, p) { return vraiFauxRelatifs(a, p); } }
       ]
     },
     {
       id: 'C9-signes', module: 'C', annee: 9, niveaux: [1, 2], theme: 'NO 9.2',
       titre: 'Distinguer le signe opératoire et le signe du nombre',
-      bornes: { max: [10, 10, 10, 10, 10], den: [1, 1, 1, 1, 1] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionSignes(a, p); } }
       ]
@@ -567,18 +661,17 @@
     {
       id: 'C9-addsous', module: 'C', annee: 9, niveaux: [1, 2], theme: 'NO 9.2',
       titre: 'Additionner et soustraire des nombres relatifs (écriture simplifiée)',
-      bornes: { max: [20, 20, 30, 30, 50], den: [1, 1, 1, 10, 10] },
       modeles: [
         { type: 'directe', gen: function (a, p, c) { return questionAddSousRelatifs(a, p, c); } },
         { type: 'directe', gen: function (a, p, c) { return questionAddSousRelatifs(a, p, c); } },
         { type: 'erreur', gen: function (a, p) { return erreurAddSousRelatifs(a, p); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxRelatifs(a, p); } }
+        { type: 'vraifaux', gen: function (a, p) { return vraiFauxRelatifs(a, p); } },
+        { type: 'directe', palierMin: 3, gen: function (a, p) { return questionParentheseMoins(a, p); } }
       ]
     },
     {
       id: 'C9-muldiv', module: 'C', annee: 9, niveaux: [1, 2], theme: 'NO 9.2',
       titre: 'Multiplier et diviser des nombres relatifs (règle des signes)',
-      bornes: { max: [150, 150, 150, 150, 150], den: [1, 1, 1, 1, 1] },
       modeles: [
         { type: 'directe', gen: function (a, p, c) { return questionMulDivRelatifs(a, p, c); } },
         { type: 'directe', gen: function (a, p, c) { return questionMulDivRelatifs(a, p, c); } },
@@ -588,15 +681,14 @@
     {
       id: 'C9-problemes', module: 'C', annee: 9, niveaux: [1, 2], theme: 'NO 9.2',
       titre: 'Résoudre des problèmes avec des nombres relatifs',
-      bornes: { max: [100, 100, 100, 100, 100], den: [10, 10, 10, 10, 10] },
       modeles: [
         { type: 'probleme', gen: function (a, p) { return problemeRelatifs(a, p); } }
       ]
     },
     {
-      id: 'C10-puissance', module: 'C', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
+      // puissance d'un relatif : 10e niveau 2 seulement (règle de l'enseignante)
+      id: 'C10-puissance', module: 'C', annee: 10, niveaux: [2], theme: 'NO 10.1',
       titre: 'Puissance d\'un entier relatif : (– 2)⁴ et – 2⁴',
-      bornes: { max: [6, 6, 6, 6, 6], den: [1, 1, 1, 1, 1] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionPuissanceRelatif(a, p); } },
         { type: 'vraifaux', gen: function (a, p) { return vraiFauxSigneProduit(a, p); } }
@@ -605,11 +697,22 @@
     {
       id: 'C10-priorites', module: 'C', annee: 10, niveaux: [1, 2], theme: 'NO 10.1',
       titre: 'Priorité des opérations avec des relatifs ; supprimer les parenthèses inutiles',
-      bornes: { max: [100, 100, 100, 100, 100], den: [1, 1, 1, 1, 1] },
+      bornesD: BORNES_PRIORITES,
       modeles: [
+        { type: 'directe', gen: function (a, p, c) { return questionPrioritesRelatifs(a, p, c, { puissances: c.niveau === 2 && p >= 4 && a.suivant() < 0.5 }); } },
         { type: 'directe', gen: function (a, p, c) { return questionPrioritesRelatifs(a, p, c); } },
-        { type: 'directe', gen: function (a, p, c) { return questionPrioritesRelatifs(a, p, c); } },
-        { type: 'directe', gen: function (a, p) { return questionParenthesesInutiles(a, p); } }
+        { type: 'directe', gen: function (a, p) { return questionParenthesesInutiles(a, p); } },
+        { type: 'directe', palierMin: 3, gen: function (a, p) { return questionParentheseMoins(a, p); } }
+      ]
+    },
+    {
+      id: 'C11-melange', module: 'C', annee: 11, niveaux: [1, 2], theme: 'NO 11.1',
+      titre: 'Calculs avec des relatifs, des fractions et des racines',
+      bornesD: BORNES_PRIORITES,
+      modeles: [
+        { type: 'directe', gen: function (a, p, c) { return questionMelange11(a, p, c); } },
+        { type: 'directe', gen: function (a, p, c) { return questionMelange11(a, p, c); } },
+        { type: 'directe', palierMin: 3, gen: function (a, p) { return questionParentheseMoins(a, p); } }
       ]
     }
   ];

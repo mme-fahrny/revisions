@@ -195,7 +195,8 @@
       if (p.s === spec.surligne) ligne.classList.add('surligne');
       ligne.appendChild(el('td', {}, p.nom));
       ligne.appendChild(el('td', {}, p.s));
-      ligne.appendChild(el('td', { 'class': 'maths' }, '10' + Maths.texteExposant(p.e)));
+      // sansNegatifs (10e niveau 1) : les puissances négatives ne sont pas encore vues
+      ligne.appendChild(el('td', { 'class': 'maths' }, spec.sansNegatifs && p.e < 0 ? '—' : '10' + Maths.texteExposant(p.e)));
       ligne.appendChild(el('td', { 'class': 'maths' }, Maths.formaterNombre(new Maths.Fraction(10).puissance(p.e))));
       function basculer() { ligne.classList.toggle('surligne'); }
       ligne.addEventListener('click', basculer);

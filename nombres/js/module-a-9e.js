@@ -56,20 +56,24 @@
    * Addition et soustraction de fractions (réutilisé en 10e et 11e)
    * ===================================================================== */
 
-  var PAIRES_FACTEUR_COMMUN = [[4, 6], [6, 8], [6, 9], [8, 12], [9, 12], [10, 15], [6, 10], [12, 15], [10, 12], [4, 10], [6, 15], [12, 18]];
+  var PAIRES_FACTEUR_COMMUN = [[4, 6], [6, 8], [6, 9], [8, 12], [9, 12], [6, 10], [10, 12], [4, 10]];
 
-  /** Deux dénominateurs selon le palier. */
+  /**
+   * Deux dénominateurs (toujours ⩽ 12) selon la difficulté :
+   * D1 égaux ou liés (l'un multiple de l'autre), D2 liés, D3 premiers entre eux,
+   * D4 avec un facteur commun (le ppmc n'est pas le produit).
+   */
   function denominateurs(alea, p) {
     var b, d;
-    if (p <= 1) { b = d = alea.choix([3, 4, 5, 6, 7, 8, 9, 10]); }
-    else if (p === 2) { b = alea.choix([2, 3, 4, 5]); d = b * alea.choix([2, 3]); if (alea.suivant() < 0.5) { var t = b; b = d; d = t; } }
+    if (p <= 1) { b = alea.choix([2, 3, 4, 5, 6]); d = alea.suivant() < 0.4 ? b : b * 2; }
+    else if (p === 2) { b = alea.choix([2, 3, 4, 6]); d = b * (b <= 4 ? alea.choix([2, 3]) : 2); }
     else if (p === 3) {
       do { b = alea.entier(2, 7); d = alea.entier(2, 9); } while (b === d || O.pgcd(b, d) !== 1);
     } else {
       var paire = alea.choix(PAIRES_FACTEUR_COMMUN);
       b = paire[0]; d = paire[1];
-      if (alea.suivant() < 0.5) { b = paire[1]; d = paire[0]; }
     }
+    if (alea.suivant() < 0.5) { var t = b; b = d; d = t; }
     return [b, d];
   }
 
@@ -123,18 +127,19 @@
    */
   function questionAddSous(alea, p, opts) {
     opts = opts || {};
-    var dd = denominateurs(alea, p);
+    var dd, essaiDen = 0;
+    do { dd = denominateurs(alea, p); essaiDen++; } while (opts.denMax && Math.max(dd[0], dd[1]) > opts.denMax && essaiDen < 100);
     var b = dd[0], d = dd[1];
     var maxNum = p >= 4 ? 2 : 1;
     var a = premierAvec(alea, b, b * maxNum - 1), c = premierAvec(alea, d, d * maxNum - 1);
     var f1 = fr(a, b), f2 = fr(c, d);
     var op = alea.suivant() < 0.5 ? '+' : '–';
     var termes = [{ f: f1, op: '' }, { f: f2, op: op }];
-    if (opts.relatifs && p >= 2 && alea.suivant() < 0.5) termes[0].f = f1.oppose();
+    if (opts.relatifs && alea.suivant() < 0.5) termes[0].f = f1.oppose();
     if (!opts.relatifs && op === '–' && f1.compare(f2) < 0) {
       termes = [{ f: f2, op: '' }, { f: f1, op: '–' }];
     }
-    if (opts.troisTermes || (p >= 5 && alea.suivant() < 0.5)) {
+    if (opts.troisTermes || (p >= 4 && alea.suivant() < 0.5)) {
       var e = alea.choix([2, 3, 4, 6]);
       var f3 = fr(alea.entier(1, e - 1), e);
       var op3 = alea.suivant() < 0.5 ? '+' : '–';
@@ -476,12 +481,17 @@
    * Objectif : écritures décimales usuelles
    * ===================================================================== */
 
-  function poolUsuelles(p) {
-    var t = [[1, 2], [1, 4], [1, 10], [1, 5]];
-    if (p >= 2) t = t.concat([[1, 8], [1, 100], [1, 1000], [1, 3]]);
-    if (p >= 3) t = t.concat([[3, 4], [2, 5], [3, 8], [2, 3], [7, 10], [3, 100]]);
-    if (p >= 4) t = t.concat([[5, 8], [7, 8], [4, 5], [9, 1000], [3, 5], [7, 100]]);
-    if (p >= 5) t = t.concat([[5, 4], [3, 2], [9, 8], [4, 3]]);
+  /**
+   * Fractions usuelles par difficulté. 9e : écritures décimales finies seulement
+   * (l'écriture périodique n'est pas travaillée en 9e). periodique : 1/3, 2/3… (10e).
+   */
+  function poolUsuelles(p, periodique) {
+    var t = [[1, 2], [1, 4], [1, 5], [1, 10]];
+    if (p >= 2) t = t.concat([[1, 100], [3, 4], [2, 5], [3, 10]]);
+    if (p >= 3) t = t.concat([[1, 8], [1, 1000], [3, 8], [7, 100], [4, 5], [3, 5]]);
+    if (p >= 4) t = t.concat([[5, 8], [7, 8], [9, 1000], [5, 4], [3, 2], [9, 20]]);
+    if (periodique && p >= 2) t = t.concat([[1, 3], [2, 3]]);
+    if (periodique && p >= 3) t = t.concat([[1, 6], [1, 9], [5, 6]]);
     return t;
   }
 
@@ -544,7 +554,7 @@
   }
 
   function vraiFauxUsuelle(alea, p) {
-    var c = alea.choix(poolUsuelles(Math.max(p, 2)));
+    var c = alea.choix(poolUsuelles(p));
     var f = fr(c[0], c[1]);
     var piege = alea.suivant() < 0.55;
     var annonce;
@@ -582,24 +592,43 @@
    * Objectif : simplifier, amplifier, irréductible
    * ===================================================================== */
 
+  /** Plus grand nombre autorisé à chaque difficulté (règles de calibrage). */
+  var LIMITE = [0, 20, 100, 200, 300];
+
   function fractionIrreductible(alea, p) {
-    var maxD = [0, 8, 10, 12, 15, 20][p];
+    var maxD = [0, 6, 10, 12, 12][p];
     var b = alea.entier(2, maxD), a;
     do { a = alea.entier(1, b - 1 + (p >= 4 ? b : 0)); } while (O.pgcd(a, b) !== 1 || a % b === 0);
     return [a, b];
   }
 
+  /** Facteur de simplification selon la difficulté : évident (D1), ⩽ 12 (D2), à trouver (D3), non évident (D4). */
+  var FACTEURS_SIMPLIFICATION = [null, [2, 5, 10], [2, 3, 4, 5, 6, 8, 9, 10, 12], [4, 6, 8, 9, 12, 14, 15, 16, 18], [7, 11, 13, 14, 18, 21, 24]];
+
+  /** Fraction a/b à simplifier par k, avec a et b sous la limite de la difficulté. */
+  function fractionASimplifier(alea, p) {
+    for (var essai = 0; essai < 200; essai++) {
+      var ab = fractionIrreductible(alea, p);
+      var k = alea.choix(FACTEURS_SIMPLIFICATION[p]);
+      if (ab[0] * k <= LIMITE[p] && ab[1] * k <= LIMITE[p]) return { ab: ab, k: k, a: ab[0] * k, b: ab[1] * k };
+    }
+    return { ab: [1, 2], k: 2, a: 2, b: 4 };
+  }
+
   function questionSimplifier(alea, p) {
-    var ab = fractionIrreductible(alea, p);
-    var k = alea.entier(2, [0, 4, 6, 9, 12, 15][p]);
-    var a = ab[0] * k, b = ab[1] * k;
+    var s = fractionASimplifier(alea, p);
+    var ab = s.ab, k = s.k, a = s.a, b = s.b;
     var f = fr(a, b);
-    var pieges = [];
+    var g = O.pgcd(a, b);
+    var pieges = [
+      { valeur: fr(a / g, b), message: 'Tu as simplifié seulement le numérateur. Pour simplifier, on divise le numérateur ET le dénominateur par le même nombre.' },
+      { valeur: fr(a, b / g), message: 'Tu as simplifié seulement le dénominateur. Pour simplifier, on divise le numérateur ET le dénominateur par le même nombre.' }
+    ].filter(function (pg) { return !pg.valeur.egal(f); });
     return O.saisie({
       type: 'directe',
       enonce: '<p>Simplifie la fraction ' + m(H.fh(a, b)) + '.</p>',
       consigne: 'Donne la <strong>fraction irréductible</strong> : on ne doit plus pouvoir la simplifier.',
-      indice: 'Cherche un diviseur commun à ' + a + ' et ' + b + ' (2, 3, 5…), ou directement le pgdc.',
+      indice: p <= 1 ? 'Divise le numérateur et le dénominateur par ' + (k === 10 ? '10' : k === 5 ? '5' : '2') + '.' : 'Cherche un diviseur commun à ' + a + ' et ' + b + ' (2, 3, 5, 7…), ou directement le pgdc.',
       reponse: { type: 'valeur', valeur: f, forme: 'irreductible' },
       pieges: pieges,
       etapes: O.etapes(etapesSimplifier(a, b)),
@@ -612,9 +641,13 @@
   }
 
   function questionAmplifier(alea, p) {
-    var ab = fractionIrreductible(alea, p);
-    var k = alea.entier(2, [0, 5, 8, 10, 12, 15][p]);
-    var cible = ab[1] * k;
+    var ab, k, cible, essai = 0;
+    do {
+      ab = fractionIrreductible(alea, p);
+      k = alea.entier(2, [0, 5, 10, 12, 15][p]);
+      cible = ab[1] * k;
+      essai++;
+    } while ((cible > LIMITE[p] || ab[0] * k > LIMITE[p]) && essai < 200);
     var inconnueEnHaut = alea.suivant() < 0.7;
     var rep = inconnueEnHaut ? ab[0] * k : cible;
     var enonce = inconnueEnHaut
@@ -634,7 +667,7 @@
       verification: 'Vérification : en simplifiant ' + m(H.fh(ab[0] * k, cible)) + ' par ' + k + ', on retrouve ' + m(H.fh(ab[0], ab[1])) + '. ✓',
       rubrique: R.amplifier,
       nombres: [fr(ab[0]), fr(ab[1]), fr(cible)],
-      controle: { expr: inconnueEnHaut ? '(' + ab[0] + '/' + ab[1] + ')*' + cible : '(' + (ab[0] * k) + ')*' + ab[1] + '/' + ab[0] }
+      controle: { expr: inconnueEnHaut ? '(' + ab[0] + '/' + ab[1] + ')*' + cible : (ab[0] * k) + ':(' + ab[0] + '/' + ab[1] + ')' }
     });
   }
 
@@ -732,10 +765,12 @@
    * ===================================================================== */
 
   function questionDecVersFraction(alea, p) {
-    var d = Math.min(3, p <= 1 ? 1 : p <= 3 ? 2 : alea.entier(2, 3));
+    // D1 : 0,6 ; D2 : deux décimales à simplifier ; D3 : trois décimales, ou nombre plus grand que 1 ; D4 : trois décimales, plus grand que 1
+    var d = p <= 1 ? 1 : p === 2 ? 2 : p === 3 ? alea.choix([2, 3]) : 3;
     var p10 = Math.pow(10, d);
+    var max = p <= 2 ? p10 - 1 : p === 3 ? (d === 2 ? 9 * p10 : p10 - 1) : 4 * p10;
     var n;
-    do { n = alea.entier(1, p >= 4 ? 4 * p10 : p10 - 1); } while (n % 10 === 0 || O.pgcd(n, p10) === 1 && p < 3);
+    do { n = alea.entier(p >= 3 && d === 2 ? p10 + 1 : 1, max); } while (n % 10 === 0 || (O.pgcd(n, p10) === 1 && p >= 2 && p <= 3));
     var f = fr(n, p10);
     return O.saisie({
       type: 'directe',
@@ -752,19 +787,23 @@
       rubrique: R.ecrituresDecimales,
       nombres: [f],
       controle: { expr: f.toString() },
+      signature: 'dec>frac:' + f.toString(),
       attenduHtml: H.f(f)
     });
   }
 
-  function questionFractionVersDec(alea, p) {
+  function questionFractionVersDec(alea, p, opts) {
+    opts = opts || {};
     var a, b;
-    if (p <= 2) {
-      b = alea.choix([2, 4, 5, 20, 25, 50]);
-      a = alea.entier(1, 2 * b); if (a % b === 0) a++;
+    // écriture périodique : seulement si demandé (10e et plus), jamais en 9e
+    var periodique = opts.periodique && p >= 2 && alea.suivant() < 0.6;
+    if (periodique) {
+      b = alea.choix([3, 6, 9, 11, 12]);
+      do { a = alea.entier(1, b - 1); } while (fr(a, b).estDecimale());
     } else {
-      var periodique = alea.suivant() < (p >= 4 ? 0.7 : 0.5);
-      b = periodique ? alea.choix([3, 6, 9, 11, 12, 15]) : alea.choix([8, 16, 20, 25, 40]);
-      do { a = alea.entier(1, 2 * b); } while (a % b === 0 || (periodique && fr(a, b).estDecimale()));
+      b = alea.choix([null, [2, 4, 5, 10], [20, 25, 50], [8, 40, 125], [8, 40, 80, 125, 200]][p]);
+      var maxA = Math.min(LIMITE[p], p <= 1 ? 2 * b : p === 2 ? b - 1 : 2 * b);
+      do { a = alea.entier(1, maxA); } while (a % b === 0);
     }
     var f = fr(a, b);
     return O.saisie({
@@ -785,7 +824,7 @@
 
   function erreurConversion(alea, p) {
     var nom = prenom(alea);
-    var d = alea.entier(2, 3);
+    var d = p <= 2 ? 2 : alea.entier(2, 3);
     var p10 = Math.pow(10, d);
     var n;
     do { n = alea.entier(11, p10 - 1); } while (n % 10 === 0);
@@ -885,7 +924,7 @@
   }
 
   function problemeQuantiteFraction(alea, p) {
-    var total = alea.choix([20, 24, 25, 28, 30, 32]);
+    var total = alea.choix(p <= 1 ? [12, 15, 16, 18, 20] : [20, 24, 25, 28, 30, 32]);
     var diviseurs = [];
     for (var d = 2; d <= total; d++) if (total % d === 0 && d <= 10) diviseurs.push(d);
     var den = alea.choix(diviseurs);
@@ -929,9 +968,9 @@
     if (genre === 'memeDen') {
       b = d = alea.entier(3, 12); a = alea.entier(1, b - 1); do { c = alea.entier(1, b - 1); } while (c === a);
     } else if (genre === 'memeNum') {
-      a = c = alea.entier(1, 7); b = alea.entier(a + 1, 12); do { d = alea.entier(a + 1, 13); } while (d === b);
+      a = c = alea.entier(1, 7); b = alea.entier(a + 1, 11); do { d = alea.entier(a + 1, 12); } while (d === b);
     } else if (genre === 'multiple') {
-      b = alea.choix([2, 3, 4, 5]); d = b * alea.choix([2, 3]); a = alea.entier(1, b - 1); do { c = alea.entier(1, d - 1); } while (c * b === a * d);
+      b = alea.choix([2, 3, 4]); d = b * alea.choix([2, 3]); a = alea.entier(1, b - 1); do { c = alea.entier(1, d - 1); } while (c * b === a * d);
     } else if (genre === 'egal') {
       var ab = fractionIrreductible(alea, 3); var k1 = alea.entier(2, 4), k2 = alea.entier(2, 5);
       if (k1 === k2) k2++;
@@ -1012,7 +1051,7 @@
   function questionComparerDecimaux(alea, p, ctx) {
     var e = alea.entier(0, p >= 3 ? 20 : 5);
     var d1 = alea.entier(1, 9);
-    var piege = alea.choix(['longueur', 'zero', 'normal']);
+    var piege = alea.choix(p >= 3 ? ['longueur', 'zero', 'normal'] : ['longueur', 'normal']);
     var x, y;
     if (piege === 'longueur') { x = new F(e * 10 + d1, 10); y = new F(e * 100 + (d1 - 1) * 10 + alea.entier(1, 9), 100); if (d1 === 1) y = new F(e * 100 + alea.entier(1, 9), 100); }
     else if (piege === 'zero') { x = new F(e * 100 + d1, 100); y = new F(e * 10 + d1, 100).plus(fr(e * 9, 10)); y = new F(e * 1000 + d1 * 10 + alea.entier(1, 9), 1000); }
@@ -1077,13 +1116,16 @@
    * ===================================================================== */
 
   function questionPart(alea, p) {
-    var ab = fractionIrreductible(alea, Math.min(p, 3));
-    var a = ab[0], b = ab[1];
-    if (a > b) a = a % b || 1;
-    var k = alea.entier(2, [0, 6, 10, 15, 25, 40][p]);
-    var c = b * k;
+    // D1 : fraction unité d'un petit nombre (1/4 de 20) ; ensuite a/b d'un nombre sous la limite
+    var a, b, c, essai = 0;
+    do {
+      var ab = fractionIrreductible(alea, Math.min(p, 3));
+      a = p <= 1 ? 1 : (ab[0] > ab[1] ? (ab[0] % ab[1]) || 1 : ab[0]); b = ab[1];
+      if (O.pgcd(a, b) !== 1) a = 1;
+      c = b * alea.entier(2, Math.max(2, Math.floor(LIMITE[p] / b)));
+      essai++;
+    } while (c > LIMITE[p] && essai < 100);
     var res = fr(a, b).fois(c);
-    if (p >= 5 && alea.suivant() < 0.5) { c = b * k + alea.choix([1, 2]) * (b % 2 === 0 ? b / 2 : 1); res = fr(a, b).fois(c); }
     var resH = res.estDecimale() ? H.n(res) : H.f(res);
     return O.saisie({
       type: 'directe',
@@ -1094,7 +1136,7 @@
       pieges: [
         { valeur: fr(c, b), message: 'Tu as calculé ' + M.formaterFraction(fr(1, b)) + ' de ' + c + ' : il faut encore multiplier par ' + a + '.' },
         { valeur: fr(c * b, a), message: 'Tu as divisé par le numérateur et multiplié par le dénominateur : c\'est l\'inverse.' },
-        { valeur: fr(c * a), message: 'Tu as multiplié par le numérateur mais oublié de diviser par le dénominateur.' }
+        { valeur: fr(c * a), message: 'Tu as confondu « fraction d\'un nombre » et multiplication par le numérateur : il faut aussi diviser par le dénominateur ' + b + '.' }
       ],
       etapes: O.etapes([
         ['Je calcule ' + m(H.fh(1, b)) + ' de ' + c + ' : je divise par ' + b + '.', m(c + ' : ' + b + ' = ' + H.n(fr(c, b)))],
@@ -1112,13 +1154,16 @@
     { tout: function (n) { return 'Elif a un abonnement de téléphone avec ' + n + ' Go de données par mois.'; }, partie: 'Elif a déjà utilisé', unite: 'Go', q: 'Combien de Go ont déjà été utilisés ?', qReste: 'Combien de Go reste-t-il pour ce mois ?', totaux: [10, 12, 20, 24, 30, 40, 60] },
     { tout: function (n) { return 'La batterie d\'une installation solaire peut stocker ' + n + ' kWh.'; }, partie: 'la batterie est chargée aux', unite: 'kWh', q: 'Combien de kWh contient-elle ?', qReste: 'Combien de kWh manque-t-il pour qu\'elle soit pleine ?', totaux: [8, 10, 12, 15, 16, 20] },
     { tout: function (n, l) { return 'Le trajet à vélo de Boudry à ' + l + ' mesure ' + n + ' km.'; }, partie: 'Luca en a déjà parcouru', unite: 'km', q: 'Combien de kilomètres ont déjà été parcourus ?', qReste: 'Combien de kilomètres reste-t-il à parcourir ?', totaux: [12, 18, 20, 24, 30, 36] },
-    { tout: function (n) { return 'Une recette de tresse demande ' + n + ' g de farine.'; }, partie: 'Zoé en a déjà versé', unite: 'g', q: 'Combien de grammes de farine ont déjà été versés ?', qReste: 'Combien de grammes de farine faut-il encore ajouter ?', totaux: [400, 500, 600, 750, 800, 1000] }
+    { tout: function (n) { return 'Une recette de tresse demande ' + n + ' g de farine.'; }, partie: 'Zoé en a déjà versé', unite: 'g', q: 'Combien de grammes de farine ont déjà été versés ?', qReste: 'Combien de grammes de farine faut-il encore ajouter ?', totaux: [120, 150, 200, 240, 250, 300] }
   ];
 
   function problemePart(alea, p) {
     var ctx = alea.choix(CONTEXTES_PART);
     var candidats = [];
+    var contextes = CONTEXTES_PART.filter(function (c) { return c.totaux.some(function (n) { return n <= LIMITE[p]; }); });
+    ctx = alea.choix(contextes);
     ctx.totaux.forEach(function (n) {
+      if (n > LIMITE[p]) return;
       [2, 3, 4, 5, 6, 8, 10].forEach(function (b) { if (n % b === 0) candidats.push([n, b]); });
     });
     var cb = alea.choix(candidats);
@@ -1151,11 +1196,15 @@
   }
 
   function erreurPart(alea, p) {
-    var ab = fractionIrreductible(alea, 3);
-    var a = ab[0] > ab[1] ? 1 : ab[0], b = ab[1];
-    if (a === 1) a = Math.min(b - 1, 2);
-    if (O.pgcd(a, b) !== 1) a = 1;
-    var k = alea.entier(2, 8);
+    var ab, a, b, essai = 0;
+    do {
+      ab = fractionIrreductible(alea, 3);
+      a = ab[0] > ab[1] ? 1 : ab[0]; b = ab[1];
+      if (a === 1) a = Math.min(b - 1, 2);
+      if (O.pgcd(a, b) !== 1) a = 1;
+      essai++;
+    } while (a * b * 2 > LIMITE[p] && essai < 100);
+    var k = alea.entier(2, Math.max(2, Math.min(8, Math.floor(LIMITE[p] / (a * b)))));
     var c = a * b * k;
     var nom = prenom(alea);
     var type = alea.choix(['inverse', 'oubli', 'juste']);
@@ -1187,13 +1236,19 @@
    * Objectif : opérations avec les nombres décimaux
    * ===================================================================== */
 
+  /**
+   * Deux décimaux pour une opération. D1 : + et – à une décimale, produit par un entier ;
+   * D2 : deux décimales, produit de deux décimaux ; D3 : division par un entier ;
+   * D4 : division par un décimal. Nombres sous la limite de la difficulté.
+   */
   function tirerDecimaux(alea, p, op, relatifs) {
     var x, y;
     if (op === '+' || op === '–') {
-      var dx = p <= 1 ? 1 : alea.entier(1, 2), dy = p <= 1 ? 1 : alea.entier(1, Math.min(3, p));
-      x = O.decimal(alea, 1, [0, 99, 999, 9999, 9999, 99999][p], dx);
-      y = O.decimal(alea, 1, [0, 99, 999, 9999, 9999, 99999][p], dy);
-      if (op === '–' && x.compare(y) < 0 && !(relatifs && p >= 5)) { var t = x; x = y; y = t; }
+      var dx = p <= 1 ? 1 : alea.entier(1, 2), dy = p <= 1 ? 1 : alea.entier(1, 2);
+      var maxE = [0, 99, 999, 9999, 9999][p];
+      x = O.decimal(alea, 1, Math.min(maxE, LIMITE[p] * Math.pow(10, dx)), dx);
+      y = O.decimal(alea, 1, Math.min(maxE, LIMITE[p] * Math.pow(10, dy)), dy);
+      if (op === '–' && x.compare(y) < 0) { var t = x; x = y; y = t; }
     } else if (op === '·') {
       if (p <= 1) { x = O.decimal(alea, 11, 99, 1); y = fr(alea.entier(2, 9)); }
       else if (p === 2) { x = O.decimal(alea, 11, 99, 1); y = O.decimal(alea, 2, 9, 1); }
@@ -1202,13 +1257,11 @@
     } else {
       // division : quotient décimal exact
       var q, dv;
-      if (p <= 1) { dv = fr(alea.entier(2, 9)); q = O.decimal(alea, 11, 99, 1); }
-      else if (p === 2) { dv = fr(alea.entier(2, 9)); q = O.decimal(alea, 11, 999, 2); }
-      else if (p === 3) { dv = O.decimal(alea, 2, 9, 1); q = fr(alea.entier(2, 30)); }
-      else { dv = O.decimal(alea, 2, 9, alea.entier(1, 2)); q = O.decimal(alea, 11, 99, 1); }
+      if (p <= 3) { dv = fr(alea.entier(2, 9)); q = O.decimal(alea, 11, p <= 2 ? 99 : 999, p <= 2 ? 1 : 2); }
+      else { dv = O.decimal(alea, 2, 9, 1); q = fr(alea.entier(2, 30)); }
       x = q.fois(dv); y = dv;
     }
-    if (relatifs && p >= 4) {
+    if (relatifs) {
       if (alea.suivant() < 0.5) x = x.oppose();
       if (alea.suivant() < 0.5) y = y.oppose();
     }
@@ -1224,8 +1277,8 @@
   }
 
   function questionDecimaux(alea, p, ctx) {
-    var op = alea.choix(p <= 1 ? ['+', '–', '·'] : ['+', '–', '·', ':']);
-    var xy = tirerDecimaux(alea, p, op, ctx && ctx.relatifs);
+    var op = alea.choix(p <= 2 ? ['+', '–', '·'] : ['+', '–', '·', ':']);
+    var xy = tirerDecimaux(alea, p, op, ctx && ctx.relatifs && p >= 4);
     var x = xy[0], y = xy[1];
     var expr = X.op(X.n(x, 'decimal'), op, X.n(y, 'decimal'));
     var res = expr.v;
@@ -1335,6 +1388,9 @@
     var a1 = articles[0], a2 = articles[1];
     var q1 = alea.entier(2, p >= 3 ? 6 : 4), q2 = alea.entier(1, 3);
     var p1 = M.Fraction.depuis(alea.choix(a1.prix)), p2 = M.Fraction.depuis(alea.choix(a2.prix));
+    // D1 : un seul article (une multiplication) ; D2 : deux articles ; D3-D4 : avec la monnaie rendue
+    var seul = p <= 1;
+    if (seul) q2 = 0;
     var total = p1.fois(q1).plus(p2.fois(q2));
     var rendu = p >= 3;
     var billet = total.compare(10) < 0 ? 10 : total.compare(20) < 0 ? 20 : 50;
@@ -1342,23 +1398,24 @@
     var inutile = p >= 4 ? ' Le magasin est ouvert de 7 h à 18 h 30.' : '';
     return O.saisie({
       type: 'probleme',
-      enonce: '<p>' + nom + ' achète ' + q1 + ' ' + a1.pluriel + ' à ' + H.chf(p1) + ' pièce et ' + q2 + ' ' + (q2 > 1 ? a2.pluriel : a2.nom) + ' à ' + H.chf(p2) + ' pièce.' + inutile + '</p>' +
+      enonce: '<p>' + nom + ' achète ' + q1 + ' ' + a1.pluriel + ' à ' + H.chf(p1) + ' pièce' + (seul ? '' : ' et ' + q2 + ' ' + (q2 > 1 ? a2.pluriel : a2.nom) + ' à ' + H.chf(p2) + ' pièce') + '.' + inutile + '</p>' +
         (rendu ? '<p>' + nom + ' paie avec un billet de ' + billet + ' francs. Combien d\'argent est rendu ?</p>' : '<p>Quel est le prix total des achats ?</p>'),
       consigne: 'Réponse en francs (par exemple 7.20).',
       suffixe: 'francs',
-      indice: 'Calcule le prix de chaque sorte d\'article (quantité · prix), puis additionne' + (rendu ? ', puis soustrais du billet.' : '.'),
+      indice: seul ? 'Multiplie la quantité par le prix d\'une pièce.' : 'Calcule le prix de chaque sorte d\'article (quantité · prix), puis additionne' + (rendu ? ', puis soustrais du billet.' : '.'),
       reponse: { type: 'montant', valeur: res },
-      pieges: rendu ? [{ valeur: total, message: 'Tu as calculé le prix total ; on demande la monnaie rendue.' }, { valeur: fr(billet).moins(p1.plus(p2)), message: 'Tu as oublié de multiplier par les quantités.' }] : [{ valeur: p1.plus(p2), message: 'Tu as oublié de multiplier par les quantités.' }],
+      pieges: rendu ? [{ valeur: total, message: 'Tu as calculé le prix total ; on demande la monnaie rendue.' }, { valeur: fr(billet).moins(p1.plus(p2)), message: 'Tu as oublié de multiplier par les quantités.' }] : seul ? [{ valeur: p1.plus(q1), message: 'Tu as additionné la quantité et le prix : il faut les multiplier.' }] : [{ valeur: p1.plus(p2), message: 'Tu as oublié de multiplier par les quantités.' }],
       estimation: true,
       etapes: O.etapes([
         ['Prix des ' + a1.pluriel + '.', m(q1 + ' · ' + H.chfStyle(p1).replace('CHF' + NB, '') + ' = ' + H.chfStyle(p1.fois(q1)).replace('CHF' + NB, '') + ' francs')],
+      ].concat(seul ? [] : [
         ['Prix ' + (q2 > 1 ? 'des ' + a2.pluriel : 'du ' + a2.nom) + '.', m(q2 + ' · ' + H.chfStyle(p2).replace('CHF' + NB, '') + ' = ' + H.chfStyle(p2.fois(q2)).replace('CHF' + NB, '') + ' francs')],
         ['Total.', m(H.chf(total))]
-      ].concat(rendu ? [['Monnaie rendue.', m(billet + '.– – ' + H.chfStyle(total).replace('CHF' + NB, '') + ' = ' + H.chf(res))]] : [])),
+      ]).concat(rendu ? [['Monnaie rendue.', m(billet + '.– – ' + H.chfStyle(total).replace('CHF' + NB, '') + ' = ' + H.chf(res))]] : [])),
       verification: 'Estimation : environ ' + Math.round(total.valeur()) + ' francs de courses. ✓',
       rubrique: R.decimaux,
-      nombres: [p1, p2, fr(q1), fr(q2)],
-      controle: { expr: rendu ? billet + '-(' + q1 + '*' + p1.toString() + '+' + q2 + '*' + p2.toString() + ')' : q1 + '*' + p1.toString() + '+' + q2 + '*' + p2.toString() },
+      nombres: seul ? [p1, fr(q1)] : [p1, p2, fr(q1), fr(q2)],
+      controle: { expr: seul ? q1 + '*(' + p1.toString() + ')' : rendu ? billet + '-(' + q1 + '*(' + p1.toString() + ')+' + q2 + '*(' + p2.toString() + '))' : q1 + '*(' + p1.toString() + ')+' + q2 + '*(' + p2.toString() + ')' },
       attenduHtml: H.chf(res)
     });
   }
@@ -1396,7 +1453,8 @@
    * ===================================================================== */
 
   function problemeDonneesUtiles(alea, p) {
-    var modele = alea.choix(['gourde', 'solaire', 'train', 'stockage']);
+    // D1 : une opération (gourde, solaire) ; D2 : + train (deux étapes) ; D3-D4 : + stockage (trois étapes)
+    var modele = alea.choix(p <= 1 ? ['gourde', 'solaire'] : p === 2 ? ['gourde', 'solaire', 'train'] : ['solaire', 'train', 'stockage']);
     var enonce, question, res, unite, etapes, expr, nombres, pieges = [];
     if (modele === 'gourde') {
       var cap = alea.choix([fr(3, 4), fr(1, 2), M.Fraction.depuis('0,6'), M.Fraction.depuis('1,5')]);
@@ -1413,7 +1471,7 @@
       pieges.push({ valeur: cap.moins(res), message: 'Tu as calculé ce qui reste dans la gourde.' });
     } else if (modele === 'solaire') {
       var prod = O.decimal(alea, 12, 48, 1);
-      var jours = alea.entier(12, 28);
+      var jours = alea.entier(p <= 1 ? 10 : 12, p <= 1 ? 20 : 28);
       res = prod.fois(jours);
       enonce = '<p>Les panneaux solaires du toit de l\'école produisent en moyenne ' + H.n(prod) + ' kWh par jour ensoleillé. En juillet (31 jours), il y a eu ' + jours + ' jours ensoleillés.</p>';
       question = 'Combien de kWh ont été produits pendant les jours ensoleillés de juillet ?';
@@ -1442,7 +1500,7 @@
         rubrique: R.decimaux, nombres: nombres, controle: { expr: expr }, attenduHtml: H.chf(res)
       });
     } else {
-      var cap2 = alea.choix([64, 128, 256]);
+      var cap2 = alea.choix(p <= 3 ? [64, 128] : [64, 128, 256]);
       var photos = alea.choix([fr(1, 4), fr(3, 8), fr(1, 8), fr(1, 2)]);
       var appli = alea.choix([fr(1, 8), fr(1, 16), fr(1, 4)]);
       if (photos.plus(appli).compare(1) >= 0) appli = fr(1, 16);
@@ -1504,9 +1562,13 @@
    * Objectif (9e, niveau 2) : pourcentages
    * ===================================================================== */
 
-  function questionFractionPourcent(alea, p) {
-    var pool = [[1, 2], [1, 4], [3, 4], [1, 5], [2, 5], [3, 5], [4, 5], [1, 10], [3, 10], [7, 10], [9, 20], [7, 20], [11, 25], [6, 25], [13, 50]];
-    if (p >= 4) pool = pool.concat([[1, 8], [3, 8], [5, 8], [7, 8], [1, 3], [2, 3]]);
+  function questionFractionPourcent(alea, p, opts) {
+    // D1 : 50 %, 25 %, 75 %, 10 % ; D2 : 35 %, 60 %… ; D3-D4 : 44 %, 37,5 %…
+    var pool = [[1, 2], [1, 4], [3, 4], [1, 10]];
+    if (p >= 2) pool = pool.concat([[7, 20], [3, 5], [2, 5], [9, 20], [6, 25], [3, 10], [7, 10], [1, 5], [4, 5]]);
+    if (p >= 3) pool = pool.concat([[11, 25], [13, 50], [3, 8], [17, 20]]);
+    if (p >= 4) pool = pool.concat([[1, 8], [5, 8], [7, 8], [3, 40]]);
+    if (opts && opts.periodique && p >= 3) pool = pool.concat([[1, 3], [2, 3]]);
     var c = alea.choix(pool);
     var f = fr(c[0], c[1]);
     var pc = f.fois(100);
@@ -1546,10 +1608,15 @@
   }
 
   function questionPourcentDe(alea, p) {
-    var pc = alea.choix(p <= 2 ? [10, 20, 25, 50, 75] : [5, 15, 30, 35, 40, 60, 12, 80]);
-    var total = alea.choix([20, 40, 60, 80, 120, 200, 240, 300, 360]);
-    var res = fr(pc * total, 100);
-    if (!res.estEntier() && p <= 2) { total = 200; res = fr(pc * 2); }
+    // D1 : 10, 25, 50, 75 % d'un petit nombre ; D2 : 12 % de 250, 35 % de 80… ; ensuite nombres ⩽ la limite
+    var pc, total, res, essai = 0;
+    var maxTotal = [0, 20, 250, 250, 300][p];
+    do {
+      pc = alea.choix(p <= 1 ? [10, 25, 50, 75] : [5, 12, 15, 20, 30, 35, 40, 60, 80]);
+      total = alea.choix([4, 8, 10, 12, 16, 20, 40, 50, 60, 80, 100, 120, 150, 200, 240, 250, 300].filter(function (t) { return t <= maxTotal; }));
+      res = fr(pc * total, 100);
+      essai++;
+    } while (!res.estEntier() && essai < 200);
     var ctx = alea.choix([
       { t: function (n) { return 'Un club de natation de ' + lieu(alea) + ' compte ' + n + ' membres.'; }, q: function (x) { return x + ' % d\'entre eux ont moins de 16 ans. Combien de membres ont moins de 16 ans ?'; }, u: 'membres' },
       { t: function (n) { return 'Une installation solaire a produit ' + n + ' kWh en une semaine.'; }, q: function (x) { return 'Le chauffe-eau en a utilisé ' + x + ' %. Combien de kWh le chauffe-eau a-t-il utilisés ?'; }, u: 'kWh' },
@@ -1601,17 +1668,88 @@
     }, alea);
   }
 
+  /** 9e N2, D3 : comparer « x % d'un nombre » et « une fraction d'un autre nombre ». */
+  function questionComparerQuantites(alea, p) {
+    var pc, A, f, B, va, vb, essai = 0;
+    var maxN = LIMITE[p];
+    do {
+      pc = alea.choix([10, 15, 20, 25, 30, 40, 60, 75]);
+      A = alea.choix([40, 60, 80, 100, 120, 150, 160, 180, 200, 240, 250, 300].filter(function (t) { return t <= maxN; }));
+      f = alea.choix([fr(1, 4), fr(1, 3), fr(2, 5), fr(3, 5), fr(3, 4), fr(2, 3), fr(1, 5)]);
+      B = alea.choix([30, 45, 60, 75, 90, 100, 120, 150, 180, 200, 240, 300].filter(function (t) { return t <= maxN; }));
+      va = fr(pc * A, 100); vb = f.fois(B);
+      essai++;
+    } while ((!va.estEntier() || !vb.estEntier() || Math.abs(va.valeur() - vb.valeur()) > 40) && essai < 300);
+    var s = va.compare(vb);
+    var bon = s < 0 ? '<' : s > 0 ? '>' : '=';
+    var ha = pc + ' % de ' + H.n(fr(A)), hb = H.f(f) + ' de ' + H.n(fr(B));
+    var signes = { '<': '&lt;', '>': '&gt;', '=': '=' };
+    var choix = ['<', '=', '>'].map(function (sym) {
+      return { h: m(ha + ' ' + signes[sym] + ' ' + hb), juste: sym === bon, cle: sym,
+        message: sym === bon ? '' : 'Calcule les deux quantités : ' + pc + ' % de ' + A + ' = ' + M.formaterNombre(va) + ' et ' + M.formaterFraction(f) + ' de ' + B + ' = ' + M.formaterNombre(vb) + '. Ne compare pas seulement ' + pc + ' % et ' + M.formaterFraction(f) + ' : les deux nombres de départ sont différents.' };
+    });
+    var items = ['pc' + pc + 'de' + A, 'f' + f.toString() + 'de' + B].sort();
+    return O.choix({
+      type: 'directe',
+      enonce: '<p>Compare ces deux quantités :</p><p class="calcul">' + m(ha + ' et ' + hb) + '</p>',
+      consigne: 'Choisis le bon signe.',
+      choix: choix,
+      ordreFixe: true,
+      indice: 'Calcule chaque quantité séparément, puis compare les résultats.',
+      etapes: O.etapes([
+        ['Je calcule le pourcentage.', m(H.fh(pc, 100) + ' · ' + A + ' = ' + H.n(va))],
+        ['Je calcule la fraction du nombre.', m(H.f(f) + ' · ' + B + ' = ' + H.n(vb))],
+        ['Je compare.', m(H.n(va) + ' ' + signes[bon] + ' ' + H.n(vb))]
+      ]),
+      rubrique: R.pourcentages,
+      nombres: [fr(pc), fr(A), f, fr(B)],
+      controle: { type: 'compare', a: pc + '/100*' + A, b: '(' + f.toString() + ')*' + B, cle: bon },
+      signature: 'pc-vs-frac:' + items.join('|')
+    }, alea);
+  }
+
+  /** 9e N2, D4 : deux remises successives (on ne peut pas additionner les pourcentages). */
+  function problemeDeuxRemises(alea, p) {
+    var prix, r1, r2, final, essai = 0;
+    do {
+      prix = alea.choix([80, 120, 150, 160, 200, 240, 250, 280, 300]);
+      r1 = alea.choix([10, 20, 25, 50]); r2 = alea.choix([10, 20, 25]);
+      final = fr(prix).fois(fr(100 - r1, 100)).fois(fr(100 - r2, 100));
+      essai++;
+    } while (!final.fois(20).estEntier() && essai < 100);
+    var apres1 = fr(prix).fois(fr(100 - r1, 100));
+    var objet = alea.choix(['une veste de ski', 'un sac de sport', 'une paire de chaussures de randonnée', 'un casque de vélo']);
+    var faux = fr(prix).fois(fr(100 - r1 - r2, 100));
+    return O.saisie({
+      type: 'probleme',
+      enonce: '<p>' + objet.charAt(0).toUpperCase() + objet.slice(1) + ' coûte ' + H.chf(fr(prix)) + '. Pendant les soldes, le magasin fait une remise de ' + r1 + ' %. Le dernier jour, il fait encore une remise de ' + r2 + ' % sur le prix déjà réduit.</p><p>Quel est le prix final ?</p>',
+      consigne: 'Réponse en francs.',
+      suffixe: 'francs',
+      indice: 'Calcule d\'abord le prix après la première remise. La deuxième remise se calcule sur ce nouveau prix.',
+      reponse: { type: 'montant', valeur: final },
+      pieges: faux.egal(final) ? [] : [{ valeur: faux, message: 'Tu as additionné les deux remises (' + (r1 + r2) + ' %). La deuxième remise porte sur le prix déjà réduit, pas sur le prix de départ.' }],
+      estimation: true,
+      etapes: O.etapes([
+        ['Première remise : il reste ' + (100 - r1) + ' % du prix.', m(H.fh(100 - r1, 100) + ' · ' + prix + ' = ' + H.n(apres1))],
+        ['Deuxième remise, sur le prix réduit : il reste ' + (100 - r2) + ' %.', m(H.fh(100 - r2, 100) + ' · ' + H.n(apres1) + ' = ' + H.n(final))]
+      ]),
+      verification: 'Vérification : deux remises de ' + r1 + ' % et ' + r2 + ' % font moins qu\'une remise de ' + (r1 + r2) + ' %, donc le prix final est plus grand que ' + H.chf(faux) + '. ✓',
+      rubrique: R.pourcentages,
+      nombres: [fr(prix), fr(r1), fr(r2)],
+      controle: { expr: prix + '*(1-' + r1 + '/100)*(1-' + r2 + '/100)' },
+      attenduHtml: H.chf(final)
+    });
+  }
+
   /* =====================================================================
    * Catalogue des objectifs de 9e
    * ===================================================================== */
 
-  var BORNES_FRACTIONS = { max: [20, 50, 100, 300, 1000], den: [20, 24, 60, 100, 1000] };
 
   var objectifs = [
     {
       id: 'A9-vocabulaire', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Vocabulaire des fractions et ensembles ℕ, ℤ, ℚ',
-      bornes: { max: [20, 60, 150, 200, 300], den: [20, 20, 100, 100, 100] },
       modeles: [
         { type: 'directe', gen: function (a, p, c) { return questionNumDen(a, p); } },
         { type: 'directe', gen: function (a) { return questionVocabulaire(a); } },
@@ -1622,7 +1760,6 @@
     {
       id: 'A9-usuelles', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Écritures décimales de 1/2, 1/3, 1/4, 1/5, 1/8, 1/10, 1/100, 1/1000',
-      bornes: { max: [1, 1, 1, 1, 2], den: [1000, 1000, 1000, 1000, 1000] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionUsuelle(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionUsuelle(a, p); } },
@@ -1632,28 +1769,25 @@
     {
       id: 'A9-simplifier', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Simplifier, amplifier, fraction irréductible',
-      bornes: { max: [80, 80, 120, 300, 400], den: [1, 1, 1, 1, 1] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionSimplifier(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionAmplifier(a, p); } },
-        { type: 'erreur', gen: function (a, p) { return erreurSimplifier(a, p); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxIrreductible(a, p); } }
+        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurSimplifier(a, p); } },
+        { type: 'vraifaux', palierMin: 2, gen: function (a, p) { return vraiFauxIrreductible(a, p); } }
       ]
     },
     {
       id: 'A9-conversions', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Passer de l\'écriture décimale à la fraction et inversement',
-      bornes: { max: [100, 100, 100, 100, 100], den: [1000, 1000, 1000, 1000, 1000] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionDecVersFraction(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionFractionVersDec(a, p); } },
-        { type: 'erreur', gen: function (a, p) { return erreurConversion(a, p); } }
+        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurConversion(a, p); } }
       ]
     },
     {
       id: 'A9-representer', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Représenter une fraction par un dessin, une quantité par une fraction',
-      bornes: { max: [32, 32, 32, 32, 32], den: [24, 24, 24, 24, 24] },
       modeles: [
         { type: 'visuel', gen: function (a, p) { return questionColorier(a, p); } },
         { type: 'visuel', gen: function (a, p) { return questionLireFraction(a, p); } },
@@ -1663,7 +1797,6 @@
     {
       id: 'A9-comparer', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Comparer deux nombres (fractions ou nombres décimaux)',
-      bornes: { max: [100, 100, 100, 100, 100], den: [1000, 1000, 1000, 1000, 1000] },
       modeles: [
         { type: 'directe', gen: function (a, p, c) { return questionComparer(a, p, c); } },
         { type: 'directe', gen: function (a, p, c) { return questionComparerDecimaux(a, p, c); } },
@@ -1673,21 +1806,19 @@
     {
       id: 'A9-part', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Calculer la part d\'un nombre (fraction d\'un nombre)',
-      bornes: { max: [1500, 1500, 1500, 1500, 1500], den: [12, 12, 12, 15, 20] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionPart(a, p); } },
         { type: 'probleme', gen: function (a, p) { return problemePart(a, p); } },
-        { type: 'erreur', gen: function (a, p) { return erreurPart(a, p); } }
+        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurPart(a, p); } }
       ]
     },
     {
       id: 'A9-decimaux', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Additionner, soustraire, multiplier et diviser des nombres décimaux',
-      bornes: { max: [100, 1000, 1000, 1000, 10000], den: [100, 100, 1000, 1000, 1000] },
       modeles: [
         { type: 'directe', gen: function (a, p, c) { return questionDecimaux(a, p, c); } },
         { type: 'directe', gen: function (a, p, c) { return questionDecimaux(a, p, c); } },
-        { type: 'erreur', gen: function (a, p) { return erreurDecimaux(a, p); } },
+        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurDecimaux(a, p); } },
         { type: 'probleme', gen: function (a, p) { return problemeMontant(a, p); } },
         { type: 'vraifaux', gen: function (a, p) { return vraiFauxEstimation(a, p); } }
       ]
@@ -1695,7 +1826,6 @@
     {
       id: 'A9-addsous', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Additionner et soustraire des fractions',
-      bornes: BORNES_FRACTIONS,
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionAddSous(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionAddSous(a, p); } },
@@ -1707,21 +1837,24 @@
     {
       id: 'A9-problemes', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Résoudre des problèmes (données utiles, estimation)',
-      bornes: { max: [300, 300, 300, 300, 300], den: [100, 100, 100, 100, 100] },
       modeles: [
         { type: 'probleme', gen: function (a, p) { return problemeDonneesUtiles(a, p); } },
         { type: 'probleme', gen: function (a, p) { return problemeDonneesUtiles(a, p); } },
-        { type: 'probleme', gen: function (a, p) { return questionOrdreGrandeur(a, p); } }
+        { type: 'probleme', palierMin: 2, gen: function (a, p) { return questionOrdreGrandeur(a, p); } }
       ]
     },
     {
       id: 'A9-pourcentages', module: 'A', annee: 9, niveaux: [2], theme: 'NO 9.3',
       titre: 'Pourcentages : notion, fraction ↔ pourcentage, comparer',
-      bornes: { max: [400, 400, 400, 400, 400], den: [100, 100, 100, 100, 100] },
+      // Un pourcentage s'écrit avec un nombre jusqu'à 100 (50 %, 75 %) dès D1 ;
+      // « 12 % de 250 » est un exercice de difficulté 2 : on autorise 250 dès D2.
+      bornesD: { nombre: [100, 250, 250, 300] },
       modeles: [
         { type: 'directe', gen: function (a, p) { return questionFractionPourcent(a, p); } },
         { type: 'probleme', gen: function (a, p) { return questionPourcentDe(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionComparerPourcent(a, p); } }
+        { type: 'directe', palierMin: 3, gen: function (a, p) { return questionComparerPourcent(a, p); } },
+        { type: 'directe', palierMin: 3, gen: function (a, p) { return questionComparerQuantites(a, p); } },
+        { type: 'probleme', palierMin: 4, gen: function (a, p) { return problemeDeuxRemises(a, p); } }
       ]
     }
   ];
@@ -1757,6 +1890,8 @@
     problemeAddition: problemeAddition,
     questionComparerPourcent: questionComparerPourcent,
     premierAvec: premierAvec,
-    de: de
+    de: de,
+    LIMITE: LIMITE,
+    denominateurs: denominateurs
   };
 });
