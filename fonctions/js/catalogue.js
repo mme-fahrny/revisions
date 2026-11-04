@@ -14,6 +14,16 @@
  * Difficulté 1 à 4, la même aux deux niveaux : le niveau 2 a du contenu en plus
  * (objectifs ou modèles réservés au niveau 2), jamais des nombres plus grands.
  * Un objectif d'une année précédente est calibré selon les règles de SON année.
+ *
+ * Décisions de l'enseignante (à appliquer aux modules B et C) :
+ *   - les règles propres à une année l'emportent sur les tailles générales
+ *     (ex. 11e N1, difficulté 1 : a de – 4 à 4) ;
+ *   - x et y peuvent être négatifs dès la 9e ; seuls les coefficients négatifs sont exclus en 9e ;
+ *   - 10e : lire les coordonnées sur tout graphique (parabole comprise) ; tracer x² et – x²
+ *     avec un tableau de valeurs : prolongement en N1, évalué en N2 ;
+ *   - 11e : croissance et décroissance en prolongement ; exponentielle (base 2) en N2 :
+ *     reconnaître son graphique, et lire un graphique dans des problèmes (lecture
+ *     d'abscisse et d'ordonnée), sans calcul de type « double chaque année ».
  */
 (function (racine, fabrique) {
   'use strict';

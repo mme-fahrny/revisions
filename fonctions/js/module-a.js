@@ -33,6 +33,9 @@
 
   /* ---------- petits outils ---------- */
   function suite(depart, pas, n) { var t = []; for (var i = 0; i < n; i++) t.push(depart + i * pas); return t; }
+  /** « de » + article : de le nombre -> du nombre ; à le nombre -> au nombre. */
+  function de(t) { return t.replace(/^le /, 'du ').replace(/^les /, 'des ').replace(/^(la |l')/, 'de $1'); }
+  function a(t) { return t.replace(/^le /, 'au ').replace(/^les /, 'aux ').replace(/^(la |l')/, 'à $1'); }
   function lettreChoix(i) { return 'ABCDEF'.charAt(i); }
   function affine(a, b) { return function (x) { return val(a).fois(val(x)).plus(val(b)); }; }
   function nombreFr(x) { return Number(val(x).valeur().toFixed(6)); }
@@ -293,7 +296,8 @@
     var ys = xs.map(function (x) { return k * x + b; });
     var nom = alea.choix(O.PRENOMS);
     var idx = alea.melanger([0, 1, 2, 3, 4]).slice(0, 3);
-    var fausse = alea.entier(0, 2);
+    var toutJuste = alea.suivant() < 0.2;
+    var fausse = toutJuste ? -1 : alea.entier(0, 2);
     var formes = alea.melanger(['f', 'image', 'point']);
     var affirmations = idx.map(function (i, j) {
       var x = xs[i], y = ys[i];
@@ -308,18 +312,18 @@
     var choix = affirmations.map(function (af) {
       return { h: af.h, juste: af.swap, message: af.swap ? '' : 'Cette affirmation est juste : dans la colonne x = ' + tn(af.x) + ', on lit f(x) = ' + tn(af.y) + '.' };
     });
-    choix.push({ h: 'Les trois affirmations sont justes.', juste: false, message: 'Une des affirmations inverse x et f(x) : contrôle chacune avec le tableau.' });
-    var af = affirmations[fausse];
+    choix.push({ h: 'Les trois affirmations sont justes.', juste: toutJuste, message: toutJuste ? '' : 'Une des affirmations inverse x et f(x) : contrôle chacune avec le tableau.' });
+    var af = affirmations[toutJuste ? 0 : fausse];
     return {
       type: 'erreur',
       enonce: '<p>Voici le tableau de valeurs d\'une fonction f.</p>' + O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: ys }]) +
-        '<p>' + nom + ' écrit trois affirmations. Laquelle est fausse ?</p>',
+        '<p>' + nom + ' écrit trois affirmations. Laquelle est fausse ? (Il se peut qu\'elles soient toutes justes.)</p>',
       indice: 'Pour chaque affirmation, repère quel nombre est x (ligne du haut) et quel nombre est f(x) (ligne du bas).',
       reponse: { type: 'choix' }, choix: choix,
       etapes: affirmations.map(function (a) {
         return { texte: a.h + ' → ' + (a.swap ? 'fausse : dans le tableau, c\'est ' + hm('f(' + tn(a.x) + ') = ' + tn(a.y)) + ' (x et f(x) sont inversés).' : 'juste : colonne x = ' + tn(a.x) + ', f(x) = ' + tn(a.y) + '.') };
       }),
-      verification: 'Vérification : ' + hm('f(' + tn(af.x) + ') = ' + tn(k) + ' · ' + O.tnp(af.x) + ' + ' + tn(b) + ' = ' + tn(af.y)) + '.',
+      verification: (toutJuste ? 'Les trois affirmations sont justes. ' : '') + 'Vérification : ' + hm('f(' + tn(af.x) + ') = ' + tn(k) + ' · ' + O.tnp(af.x) + ' + ' + tn(b) + ' = ' + tn(af.y)) + '.',
       rubrique: R.fonction,
       controle: { ops: 3, xs: xs, ys: ys, coefs: [k, b], calc: { genre: 'choix' } }
     };
@@ -391,7 +395,7 @@
     var y0 = p * x0;
     var ymax = Math.ceil((p * xmax) / 10) * 10;
     var g = { xmin: 0, xmax: xmax, ymin: 0, ymax: ymax, gx: 1, gy: 2, lx: 1, ly: 10, titreX: c.titreX, titreY: c.titreY,
-      description: 'Graphique du prix en fonction de ' + c.x };
+      description: 'Graphique du prix en fonction ' + de(c.x) };
     if (c.discret) g.points = suite(0, 1, xmax + 1).map(function (x) { return { x: x, y: p * x }; });
     else g.courbes = [{ src: O.srcAffine(p, 0) }];
     var pieges = [];
@@ -399,7 +403,7 @@
     pieges.push({ valeur: x0, message: 'Tu as donné la valeur de x. Le prix se lit sur l\'axe vertical, en face du point d\'abscisse ' + tn(x0) + '.' });
     return {
       type: 'lecture',
-      enonce: '<p>Le graphique donne ' + c.y + ' en fonction de ' + c.x + '.</p>' + FICTIF + O.graphiqueHtml(g) + '<p>Lis sur le graphique le prix de ' + c.n(x0) + '.</p>',
+      enonce: '<p>Le graphique donne ' + c.y + ' en fonction ' + de(c.x) + '.</p>' + FICTIF + O.graphiqueHtml(g) + '<p>Lis sur le graphique le prix de ' + c.n(x0) + '.</p>',
       indice: 'Pars de ' + tn(x0) + ' sur l\'axe horizontal, monte jusqu\'au ' + (c.discret ? 'point' : 'trait') + ', puis va à gauche lire le prix sur l\'axe vertical. Un petit carreau vaut 2 CHF en hauteur.',
       reponse: { type: 'nombre', valeur: y0, montant: true },
       suffixe: 'CHF',
@@ -433,7 +437,7 @@
     choix = O.melanger(alea, choix).map(function (ch, i) { ch.h = '<span class="nom-choix">Graphique ' + lettreChoix(i) + '</span>' + ch.h; return ch; });
     return {
       type: 'relier',
-      enonce: '<p>' + c.phrase(fixe, p) + '</p>' + FICTIF + '<p>Quel graphique donne ' + c.y + ' en fonction de ' + c.x + ' ?</p>',
+      enonce: '<p>' + c.phrase(fixe, p) + '</p>' + FICTIF + '<p>Quel graphique donne ' + c.y + ' en fonction ' + de(c.x) + ' ?</p>',
       indice: 'Combien paie-t-on pour x = 0 ? Où le graphique doit-il commencer sur l\'axe vertical ? Puis : de combien le prix augmente-t-il pour chaque unité en plus ?',
       reponse: { type: 'choix' }, choix: choix, choixGraphiques: true,
       etapes: [
@@ -579,7 +583,7 @@
     });
     return {
       type: 'vraifaux',
-      enonce: '<p>' + phrase + '</p>' + FICTIF + '<p>« Le prix est proportionnel à ' + x + '. » Vrai ou faux ?</p>',
+      enonce: '<p>' + phrase + '</p>' + FICTIF + '<p>« Le prix est proportionnel ' + a(x) + '. » Vrai ou faux ?</p>',
       indice: 'Calcule le prix pour 1, puis pour 2. Le prix double-t-il ?',
       reponse: { type: 'choix' }, choix: opts,
       etapes: [
@@ -765,25 +769,26 @@
     var xs = [alea.entier(1, 3)];
     while (xs.length < 4) xs.push(xs[xs.length - 1] + alea.entier(1, 3));
     var ys = xs.map(function (x) { return k * x; });
-    var faux = alea.entier(1, 3);
+    var toutJuste = alea.suivant() < 0.2;
+    var faux = toutJuste ? -1 : alea.entier(1, 3);
     var ecrit = ys.slice();
-    ecrit[faux] = ys[faux - 1] + (xs[faux] - xs[faux - 1]);
+    if (!toutJuste) ecrit[faux] = ys[faux - 1] + (xs[faux] - xs[faux - 1]);
     var choix = xs.map(function (x, i) {
       return { h: 'la case sous x = ' + tn(x), juste: i === faux, message: i === faux ? '' : 'Cette case est juste : ' + hm(tn(x) + ' · ' + tn(k) + ' = ' + tn(ys[i])) + '.' };
     }).slice(1);
-    choix.push({ h: 'aucune case, tout est juste', juste: false, message: 'Une case n\'est pas obtenue en multipliant par ' + tn(k) + '.' });
+    choix.push({ h: 'aucune case, tout est juste', juste: toutJuste, message: toutJuste ? '' : 'Une case n\'est pas obtenue en multipliant par ' + tn(k) + '.' });
     return {
       type: 'erreur',
       enonce: '<p>' + nom + ' complète ce tableau de proportionnalité (on multiplie x par ' + tn(k) + ').</p>' +
-        O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: ecrit }]) + '<p>Quelle case est fausse ?</p>',
+        O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: ecrit }]) + '<p>Quelle case est fausse ? (Il se peut qu\'aucune ne le soit.)</p>',
       indice: 'Contrôle chaque colonne : x · ' + tn(k) + ' donne-t-il bien le nombre du bas ?',
       reponse: { type: 'choix' }, choix: choix,
       etapes: [
         { texte: 'On contrôle chaque colonne.', calcul: hm(xs.map(function (x, i) { return tn(x) + ' · ' + tn(k) + ' = ' + tn(ys[i]); }).join(' ; ')) },
-        { texte: 'Sous x = ' + tn(xs[faux]) + ', ' + nom + ' a écrit ' + tn(ecrit[faux]) + ' au lieu de ' + tn(ys[faux]) + '.' },
-        { texte: E.additif + ' ' + nom + ' a ajouté ' + tn(xs[faux] - xs[faux - 1]) + ' à la case précédente, comme pour x.' }
+        toutJuste ? { texte: 'Toutes les cases sont obtenues en multipliant x par ' + tn(k) + '.' } : { texte: 'Sous x = ' + tn(xs[faux]) + ', ' + nom + ' a écrit ' + tn(ecrit[faux]) + ' au lieu de ' + tn(ys[faux]) + '.' },
+        toutJuste ? { texte: 'Aucune case n\'est fausse : le tableau est juste.' } : { texte: E.additif + ' ' + nom + ' a ajouté ' + tn(xs[faux] - xs[faux - 1]) + ' à la case précédente, comme pour x.' }
       ],
-      verification: 'Contrôle : ' + hm(tn(ys[faux]) + ' : ' + tn(xs[faux]) + ' = ' + tn(k)) + ', comme dans les autres colonnes.',
+      verification: toutJuste ? 'Contrôle : chaque f(x) divisé par x donne ' + tn(k) + '.' : 'Contrôle : ' + hm(tn(ys[faux]) + ' : ' + tn(xs[faux]) + ' = ' + tn(k)) + ', comme dans les autres colonnes.',
       rubrique: R.proportionnalite,
       controle: { ops: 3, xs: xs, ys: ecrit.concat(ys), coefs: [k], calc: { genre: 'choix' } }
     };
@@ -829,7 +834,7 @@
     var g = { xmin: 0, xmax: 8, ymin: 0, ymax: 50, gx: 1, gy: 2, lx: 1, ly: 10, titreX: c.titreX, titreY: c.titreY, courbes: [{ src: O.srcAffine(p, fixe) }], description: 'Droite qui part de (0 ; ' + fixe + ')' };
     return {
       type: 'probleme',
-      enonce: '<p>Le graphique donne ' + c.y + ' en fonction de ' + c.x + '.</p>' + FICTIF + O.graphiqueHtml(g) + '<p>Combien paie-t-on pour ' + c.n(x0) + ' ?</p>',
+      enonce: '<p>Le graphique donne ' + c.y + ' en fonction ' + de(c.x) + '.</p>' + FICTIF + O.graphiqueHtml(g) + '<p>Combien paie-t-on pour ' + c.n(x0) + ' ?</p>',
       indice: 'Lis sur le graphique le prix pour 0, puis l\'augmentation pour 1 unité de plus. Écris l\'expression fonctionnelle, puis calcule f(' + tn(x0) + ').',
       reponse: { type: 'nombre', valeur: y0, montant: true },
       suffixe: 'CHF',
@@ -888,24 +893,6 @@
     };
   }
 
-  /** D1 — conversion EUR -> CHF avec le taux fictif (un calcul). */
-  function genConversionSimple(alea, d) {
-    var m = alea.choix([2, 3, 4, 5]);
-    var eur = TAUX.eur * m, chf = TAUX.chf * m;
-    return {
-      type: 'probleme',
-      enonce: '<p>' + MENTION_TAUX + '</p><p>Combien de CHF obtient-on pour ' + tn(eur) + ' EUR ?</p>',
-      indice: tn(eur) + ' EUR, c\'est ' + m + ' fois 10 EUR.',
-      reponse: { type: 'nombre', valeur: chf, montant: true },
-      suffixe: 'CHF',
-      pieges: [{ valeur: eur, message: 'Tu n\'as pas converti : 10 EUR ne valent pas 10 CHF, mais 9 CHF.' }, { valeur: eur - 1, message: E.additif + ' La différence entre EUR et CHF n\'est pas toujours 1.' }],
-      etapes: [{ texte: tn(eur) + ' EUR = ' + m + ' · 10 EUR, donc on obtient ' + m + ' · 9 CHF.', calcul: hm(m + ' · 9 = ' + tn(chf)) }],
-      verification: 'Vérification : ' + hm(tn(chf) + ' : 9 = ' + m) + ' et ' + hm(tn(eur) + ' : 10 = ' + m) + '.',
-      rubrique: R.proportionnalite,
-      controle: { ops: 1, xs: [eur], ys: [chf], coefs: [], calc: { genre: 'conversion', eur: eur, versChf: true } }
-    };
-  }
-
   /** D2 — règle de trois : n1 unités coûtent P, combien coûtent n2 unités ? */
   function genRegleDeTrois(alea, d) {
     var c = alea.choix(CONTEXTES_PROP);
@@ -936,7 +923,7 @@
   function genErreurAdditive(alea, d) {
     var nom = alea.choix(O.PRENOMS);
     var g = alea.choix([50, 60, 75, 80, 100]);
-    var n1 = alea.choix([2, 4]), n2 = n1 * alea.choix([2, 3]);
+    var n1 = alea.choix([2, 4]), n2 = n1 * (n1 === 2 ? alea.choix([2, 3]) : 2);
     var m1 = g * n1, m2 = g * n2, erreur = m1 + (n2 - n1);
     var produit = alea.choix(['de farine', 'de pâtes', 'de riz']);
     var opts = O.optionsVraiFaux(alea, {
@@ -1168,7 +1155,6 @@
     { id: 'A4', module: 'A', annee: 9, niveaux: [1, 2], statut: 'evalue', theme: 'FA 9.1', titre: 'Proportionnalité et problèmes de quantité (prix, CHF et EUR)',
       modeles: [
         { type: 'probleme', dMin: 1, dMax: 1, gen: genPrixUnitaire },
-        { type: 'probleme', dMin: 1, dMax: 1, gen: genConversionSimple },
         { type: 'probleme', dMin: 2, dMax: 2, gen: genRegleDeTrois },
         { type: 'erreur', dMin: 2, dMax: 2, gen: genErreurAdditive },
         { type: 'lecture', dMin: 3, dMax: 3, gen: genGraphiqueConversion },
