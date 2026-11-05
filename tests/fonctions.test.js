@@ -52,7 +52,7 @@ function empreinte(texte) {
   for (var i = 0; i < texte.length; i++) { h ^= texte.charCodeAt(i); h = Math.imul(h, 16777619); }
   return ('0000000' + (h >>> 0).toString(16)).slice(-8);
 }
-var REFERENCES = ['4efeb2c6', '01fc0160'];
+var REFERENCES = ['4efeb2c6', '01fc0160', '44ff6ee8', '0fb8c8a8', '03fe54e5', '7396e873', '66d291f0', '8368a7b2', '31fcf80f'];
 /** Signatures recalculées À PARTIR DES PARAMÈTRES (controle), pas de q.signatures. */
 function signaturesControle(q) {
   var c = q.controle, s = [];
