@@ -43,7 +43,17 @@
     graphique: 'Graphique d\'une fonction',
     expression: 'Expression fonctionnelle',
     proportionnalite: 'Proportionnalité',
-    vitesse: 'Vitesse moyenne'
+    vitesse: 'Vitesse moyenne',
+    affine: 'Fonction affine',
+    lineaire: 'Fonction linéaire',
+    constante: 'Fonction constante',
+    pente: 'Pente d\'une droite',
+    intersection: 'Intersection de deux droites',
+    pourcentage: 'Pourcentage',
+    echelle: 'Échelle',
+    agrandissement: 'Agrandissement et réduction',
+    diagrammes: 'Diagrammes',
+    quadratique: 'Fonction quadratique'
   };
 
   /* =====================================================================
@@ -57,7 +67,14 @@
     fixeUnitaire: 'Tu as confondu le montant fixe et le prix par unité : le montant fixe se paie une seule fois, le prix par unité est multiplié par x.',
     oubliFixe: 'Tu as oublié le montant fixe : il s\'ajoute au prix des unités.',
     additif: 'Tu as ajouté au lieu de multiplier : dans une situation de proportionnalité, si x est multiplié par 2, y est aussi multiplié par 2.',
-    premiereColonne: 'Ton expression convient pour la première colonne seulement : vérifie-la avec TOUTES les colonnes du tableau.'
+    premiereColonne: 'Ton expression convient pour la première colonne seulement : vérifie-la avec TOUTES les colonnes du tableau.',
+    ordonneePente: 'Tu as confondu l\'ordonnée à l\'origine et la pente : dans f(x) = ax + b, b est l\'ordonnée à l\'origine (le point (0 ; b)) et a est la pente.',
+    penteB: 'La pente n\'est pas l\'ordonnée à l\'origine : la pente dit de combien f(x) change quand x augmente de 1.',
+    penteSigne: 'Attention au signe de la pente : si la droite descend (de gauche à droite), la pente est négative.',
+    penteOrdre: 'Garde le même ordre des points en haut et en bas : p = (y₂ – y₁) : (x₂ – x₁).',
+    penteInverse: 'Tu as calculé (x₂ – x₁) : (y₂ – y₁) : la pente est la variation de y DIVISÉE par la variation de x.',
+    affineOrigine: 'Une droite affine avec b ≠ 0 ne passe pas par l\'origine : f(0) = b.',
+    intersection: 'Le point d\'intersection doit vérifier LES DEUX expressions : contrôle aussi avec l\'autre fonction.'
   };
 
   var PRENOMS = ['Léa', 'Noah', 'Elif', 'Luca', 'Amélie', 'Yanis', 'Sara', 'Mattia', 'Inès',
@@ -171,6 +188,16 @@
         pts.push(X(x) + ',' + Y(y));
       }
       s.push('<polyline class="courbe ' + (c.classe || 'c' + i) + '" clip-path="url(#' + clip + ')" points="' + pts.join(' ') + '"/>');
+      if (c.nom) {
+        // nom de la courbe près du bord droit, à l'intérieur du repère
+        for (var q = 0; q <= 40; q++) {
+          var xn = xmax - (xmax - xmin) * (0.04 + q * 0.02), yn = Maths.evaluerApproche(c.src, { x: xn });
+          if (yn < ymax - (ymax - ymin) * 0.06 && yn > ymin + (ymax - ymin) * 0.06) {
+            s.push('<text class="nom-courbe ' + (c.classe || 'c' + i) + '" x="' + (X(xn) - 4) + '" y="' + (Y(yn) - 8) + '" text-anchor="end">' + echapper(c.nom) + '</text>');
+            break;
+          }
+        }
+      }
     });
     (def.segments || []).forEach(function (seg, i) {
       s.push('<polyline class="courbe c' + i + '" clip-path="url(#' + clip + ')" points="' + seg.map(function (p) { return X(p[0]) + ',' + Y(p[1]); }).join(' ') + '"/>');
@@ -182,6 +209,56 @@
     s.push('</svg>');
     return s.join('');
   }
+  /**
+   * Diagramme en barres (SVG). def : { categories: [texte], valeurs: [nombre | null], max, pas
+   * (quadrillage), lpas (nombres écrits), titreY, description }. Une valeur null : barre absente.
+   */
+  function svgBarres(def) {
+    var n = def.categories.length, L = 300, Hh = 200, mg = 42, mh = 22, mb = 40, md = 10;
+    var W = mg + L + md, H = mh + Hh + mb, larg = L / n;
+    function Y(v) { return +(mh + Hh - v * Hh / def.max).toFixed(2); }
+    var s = ['<svg class="svg-fonction svg-barres" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + echapper(def.description || 'Diagramme en barres') + '">'];
+    s.push('<g class="grille">');
+    for (var k = 0; k <= def.max + 1e-9; k += def.pas) s.push('<line x1="' + mg + '" y1="' + Y(k) + '" x2="' + (mg + L) + '" y2="' + Y(k) + '"/>');
+    s.push('</g><g class="nombres-axes">');
+    for (k = 0; k <= def.max + 1e-9; k += def.lpas || def.pas) s.push('<text x="' + (mg - 5) + '" y="' + (Y(k) + 4) + '" text-anchor="end">' + echapper(tn(+k.toFixed(6))) + '</text>');
+    s.push('</g>');
+    def.categories.forEach(function (c, i) {
+      var x = mg + i * larg + larg * 0.18, w = larg * 0.64, v = def.valeurs[i];
+      if (v !== null && v !== undefined) s.push('<rect class="barre" x="' + x.toFixed(2) + '" y="' + Y(v) + '" width="' + w.toFixed(2) + '" height="' + (Y(0) - Y(v)).toFixed(2) + '"/>');
+      else s.push('<rect class="barre-vide" x="' + x.toFixed(2) + '" y="' + Y(def.max * 0.04) + '" width="' + w.toFixed(2) + '" height="' + (Y(0) - Y(def.max * 0.04)).toFixed(2) + '"/>');
+      s.push('<text class="categorie" x="' + (mg + (i + 0.5) * larg).toFixed(2) + '" y="' + (mh + Hh + 16) + '" text-anchor="middle">' + echapper(c) + '</text>');
+    });
+    s.push('<g class="axes"><line x1="' + mg + '" y1="' + Y(0) + '" x2="' + (mg + L) + '" y2="' + Y(0) + '"/><line x1="' + mg + '" y1="' + Y(0) + '" x2="' + mg + '" y2="' + (mh - 6) + '"/></g>');
+    if (def.titreY) s.push('<text class="titre-axe" x="' + (mg + 6) + '" y="' + (mh - 8) + '">' + echapper(def.titreY) + '</text>');
+    s.push('</svg>');
+    return '<div class="cadre-graphique">' + s.join('') + '</div>';
+  }
+
+  /**
+   * Diagramme circulaire (SVG). def : { categories: [texte], parts: [pourcentages], etiquettes:
+   * [texte affiché dans la légende], description }. Les parts sont en % (somme 100).
+   */
+  function svgCirculaire(def) {
+    var cx = 110, cy = 110, r = 96, a0 = -Math.PI / 2;
+    var s = ['<svg class="svg-fonction svg-circulaire" viewBox="0 0 220 220" role="img" aria-label="' + echapper(def.description || 'Diagramme circulaire') + '">'];
+    def.parts.forEach(function (p, i) {
+      var a1 = a0 + 2 * Math.PI * p / 100;
+      var x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0), x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+      var grand = p > 50 ? 1 : 0;
+      s.push('<path class="secteur s' + (i % 6) + '" d="M' + cx + ' ' + cy + ' L' + x0.toFixed(2) + ' ' + y0.toFixed(2) + ' A' + r + ' ' + r + ' 0 ' + grand + ' 1 ' + x1.toFixed(2) + ' ' + y1.toFixed(2) + ' Z"/>');
+      var am = (a0 + a1) / 2;
+      s.push('<text class="lettre-secteur" x="' + (cx + r * 0.62 * Math.cos(am)).toFixed(2) + '" y="' + (cy + r * 0.62 * Math.sin(am) + 5).toFixed(2) + '" text-anchor="middle">' + lettre(i) + '</text>');
+      a0 = a1;
+    });
+    s.push('</svg>');
+    var leg = '<ul class="legende-secteurs">' + def.categories.map(function (c, i) {
+      return '<li><span class="pastille-secteur s' + (i % 6) + '" aria-hidden="true">' + lettre(i) + '</span> ' + echapper(c) + (def.etiquettes && def.etiquettes[i] ? ' : ' + def.etiquettes[i] : '') + '</li>';
+    }).join('') + '</ul>';
+    return '<div class="cadre-circulaire">' + s.join('') + leg + '</div>';
+  }
+  function lettre(i) { return 'ABCDEFGH'.charAt(i); }
+
   /** Graphique dans un cadre (HTML). */
   function graphiqueHtml(def) { return '<div class="cadre-graphique">' + svgGraphique(def) + '</div>'; }
 
@@ -405,7 +482,7 @@
   function texteAttendu(q) {
     var r = q.reponse;
     switch (r.type) {
-      case 'nombre': return r.montant ? hm(tm(r.valeur)) : hm(tn(r.valeur) + (r.unite ? ' ' + r.unite : ''));
+      case 'nombre': return r.montant ? hm(tm(r.valeur)) : hm(tn(r.valeur) + (r.unite ? (r.unite === '°' ? '' : NBSP) + r.unite : ''));
       case 'expr': return hf(r.attendu, r.nom);
       case 'liste': return hm(r.valeurs.map(tn).join(' ; '));
       case 'couple': return hm(tc(r.x, r.y));
@@ -426,6 +503,11 @@
       });
     }
     q.mode = q.reponse.type === 'choix' ? 'choix' : 'champ';
+    // espaces insécables avant ? ! ; : » et après « (hors balises)
+    var fines = function (h) { return typeof h === 'string' ? h.replace(/(>[^<]*)/g, function (m) { return m.replace(/ ([?!;:»])/g, NBSP + '$1').replace(/« /g, '«' + NBSP); }) : h; };
+    q.enonce = fines('>' + q.enonce).slice(1);
+    if (q.consigne) q.consigne = fines('>' + q.consigne).slice(1);
+    (q.choix || []).forEach(function (c) { c.h = fines('>' + c.h).slice(1); });
     if (!q.etapes) q.etapes = [];
     q.etapes.forEach(function (e, i) { e.titre = 'ÉTAPE ' + (i + 1); });
     q.attenduHtml = q.attenduHtml || texteAttendu(q);
@@ -465,7 +547,7 @@
     for (var i = 0; i < texte.length; i++) { h ^= texte.charCodeAt(i); h = Math.imul(h, 16777619); }
     return ('0000000' + (h >>> 0).toString(16)).slice(-8);
   }
-  var EMPREINTES_REFERENCES = ['4efeb2c6', '01fc0160'];
+  var EMPREINTES_REFERENCES = ['4efeb2c6', '01fc0160', '44ff6ee8', '0fb8c8a8', '03fe54e5', '7396e873', '66d291f0', '8368a7b2', '31fcf80f'];
   function estReference(signatures) {
     return (signatures || []).some(function (s) { return EMPREINTES_REFERENCES.indexOf(empreinte(s)) >= 0; });
   }
@@ -475,7 +557,7 @@
     RUBRIQUES: RUBRIQUES, ERREURS: ERREURS, PRENOMS: PRENOMS, MENTION_FICTIVE: MENTION_FICTIVE,
     val: val, tn: tn, hn: hn, tnp: tnp, tm: tm, tc: tc, sn: sn, tx: tx, hm: hm, hf: hf,
     srcAffine: srcAffine, pluriel: pluriel, echapper: echapper,
-    tableauHtml: tableauHtml, svgGraphique: svgGraphique, graphiqueHtml: graphiqueHtml, pasAdapte: pasAdapte,
+    tableauHtml: tableauHtml, svgGraphique: svgGraphique, svgBarres: svgBarres, svgCirculaire: svgCirculaire, graphiqueHtml: graphiqueHtml, pasAdapte: pasAdapte,
     lireNombre: lireNombre, lireExpr: lireExpr, lireCouple: lireCouple,
     verifier: verifier, exemples: exemples, clavierPour: clavierPour, finaliser: finaliser,
     melanger: melanger, optionsVraiFaux: optionsVraiFaux,

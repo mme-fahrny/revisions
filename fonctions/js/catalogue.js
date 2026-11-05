@@ -28,9 +28,9 @@
 (function (racine, fabrique) {
   'use strict';
   if (typeof module === 'object' && module.exports) {
-    module.exports = fabrique(require('./outils.js'), [require('./module-a.js')]);
+    module.exports = fabrique(require('./outils.js'), [require('./module-a.js'), require('./module-b.js')]);
   } else {
-    racine.Fonctions = fabrique(racine.FonctionsOutils, [racine.FonctionsModuleA]);
+    racine.Fonctions = fabrique(racine.FonctionsOutils, [racine.FonctionsModuleA, racine.FonctionsModuleB]);
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (O, fichiers) {
   'use strict';
@@ -67,7 +67,8 @@
     return objectifs.filter(function (o) {
       return (!module || o.module === module) && o.annee <= profil.annee && o.niveaux.indexOf(profil.niveau) >= 0;
     }).map(function (o) {
-      var statut = o.statut === 'theorique' ? 'theorique' : o.statut === 'plusLoin' ? 'plusLoin' : (o.annee === profil.annee ? 'courant' : 'revision');
+      var plusLoin = o.statut === 'plusLoin' || (profil.niveau === 1 && (o.plusLoinN1 || []).indexOf(profil.annee) >= 0);
+      var statut = o.statut === 'theorique' ? 'theorique' : plusLoin ? 'plusLoin' : (o.annee === profil.annee ? 'courant' : 'revision');
       return { objectif: o, statut: statut };
     });
   }
@@ -84,14 +85,12 @@
     var m = o.modeles.filter(function (x) { return (!x.dMin || p >= x.dMin) && (!x.dMax || p <= x.dMax) && (!x.niveaux || x.niveaux.indexOf(niveau) >= 0); });
     if (!m.length) {
       // pas de modèle à cette difficulté : on prend la difficulté disponible la plus proche
-      var meilleur = null, ecart = Infinity;
+      var ecart = Infinity;
       o.modeles.forEach(function (x) {
         if (x.niveaux && x.niveaux.indexOf(niveau) < 0) return;
-        var e = Math.min(Math.abs((x.dMin || 1) - p), Math.abs((x.dMax || 4) - p));
-        if (e < ecart) { ecart = e; meilleur = x; }
+        ecart = Math.min(ecart, Math.abs((x.dMin || 1) - p), Math.abs((x.dMax || 4) - p));
       });
       m = o.modeles.filter(function (x) { return (!x.niveaux || x.niveaux.indexOf(niveau) >= 0) && Math.min(Math.abs((x.dMin || 1) - p), Math.abs((x.dMax || 4) - p)) === ecart; });
-      void meilleur;
     }
     return m;
   }
