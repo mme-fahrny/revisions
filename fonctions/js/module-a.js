@@ -227,7 +227,7 @@
       reponse: { type: 'choix' }, choix: opts,
       etapes: [
         { texte: 'Pour chaque colonne, on calcule f(x) : x.', calcul: hm(xs.map(function (x, i) { return tn(ys[i]) + ' : ' + tn(x) + ' = ' + tn(new F(ys[i], x)); }).join(' ; ')) },
-        { texte: vrai ? 'On obtient toujours ' + tn(k) + ' : c\'est un tableau de proportionnalité (coefficient ' + tn(k) + ').' : 'Les quotients ne sont pas tous égaux : ce n\'est pas un tableau de proportionnalité.' }
+        { texte: vrai ? 'On obtient toujours ' + tn(k) + ' : c\'est un tableau de proportionnalité (facteur de proportionnalité ' + tn(k) + ').' : 'Les quotients ne sont pas tous égaux : ce n\'est pas un tableau de proportionnalité.' }
       ],
       verification: vrai ? 'Contrôle : ' + hm(tn(x1) + ' · ' + tn(k) + ' = ' + tn(ys[0])) + '.' : 'Contrôle : si c\'était proportionnel, f(' + tn(x2) + ') vaudrait ' + tn(q1.fois(x2)) + ' et non ' + tn(ys[2]) + '.',
       rubrique: R.proportionnalite,
@@ -888,7 +888,7 @@
       pieges: pieges,
       etapes: [etape],
       verification: sens === 'unitaire' ? 'Vérification : ' + hm(tn(p) + ' · ' + tn(n) + ' = ' + tn(total)) + '.' : 'Vérification : ' + hm(tn(total) + ' : ' + tn(n) + ' = ' + tn(p)) + '.',
-      rubrique: R.proportionnalite,
+      rubrique: R.problemeProportionnalite,
       controle: { ops: 1, xs: [n], ys: [total], coefs: [p], calc: sens === 'unitaire' ? { genre: 'prix', n1: n, p1: total, n2: 1 } : { genre: 'prix', n1: 1, p1: p, n2: n } }
     };
   }
@@ -914,7 +914,7 @@
         { texte: 'Prix de ' + c.n(n2) + '.', calcul: hm(tn(p) + ' · ' + tn(n2) + ' = ' + tn(P2)) }
       ],
       verification: 'Vérification : ' + hm(tn(P2) + ' : ' + tn(n2) + ' = ' + tn(p)) + ', le même prix unitaire.',
-      rubrique: R.proportionnalite,
+      rubrique: R.problemeProportionnalite,
       controle: { ops: 2, xs: [n1, n2], ys: [P1, P2], coefs: [p], calc: { genre: 'prix', n1: n1, p1: P1, n2: n2 } }
     };
   }
@@ -1019,7 +1019,7 @@
         { texte: q.estEntier() ? 'On calcule.' : tn(q) + ' kg, c\'est la moitié d\'un kilo : on divise par 2.', calcul: hm(tn(p) + ' · ' + tn(q) + ' = ' + tn(total)) }
       ],
       verification: 'Vérification : ' + hm(tn(total) + ' : ' + tn(q) + ' = ' + tn(p)) + ' CHF par kilo.',
-      rubrique: R.proportionnalite,
+      rubrique: R.problemeProportionnalite,
       controle: { ops: 3, xs: [q.toString()], ys: [total.toString()], coefs: [p.toString()], calc: { genre: 'prix', n1: 1, p1: p.toString(), n2: q.toString() } }
     };
   }
@@ -1110,7 +1110,7 @@
         { texte: 'On calcule la différence.', calcul: hm(tn(Math.max(chf, enChf)) + ' – ' + tn(Math.min(chf, enChf)) + ' = ' + tn(diff)) }
       ],
       verification: 'Le moins cher est ' + (chf < enChf ? 'le magasin de La Chaux-de-Fonds' : 'le magasin en France') + ', de ' + tm(diff) + '.',
-      rubrique: R.proportionnalite,
+      rubrique: R.problemeProportionnalite,
       controle: { ops: 3, xs: [eur], ys: [chf], coefs: ['0.9'], calc: { genre: 'difference', eur: eur, chf: chf } }
     };
   }

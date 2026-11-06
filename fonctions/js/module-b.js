@@ -335,7 +335,7 @@
         { texte: 'On écrit l\'expression.', calcul: hl(l) }
       ],
       verification: 'Contrôle avec B : ' + hm('f(' + pas + ') = ' + tn(l.a) + ' · ' + pas + ' + ' + tnp(l.b) + ' = ' + tn(image(l, pas))) + '.',
-      rubrique: R.affine,
+      rubrique: R.expressionGraphique,
       signatures: [sig(l)],
       controle: { ops: d >= 4 ? 3 : 2, xs: [0, pas], ys: [l.b.toString(), image(l, pas).toString()], coefs: [l.a.toString(), l.b.toString()], grad: [1, 1], calc: { genre: 'expr', a: l.a.toString(), b: l.b.toString() } }
     };
@@ -364,7 +364,7 @@
         { texte: 'Un deuxième point : ' + hm('f(2) = ' + tn(image(l, 2))) + ', donc ' + hm(tc(2, image(l, 2))) + '.' }
       ],
       verification: 'Contrôle sur le graphique choisi : il passe par ' + hm(tc(0, l.b)) + ' et par ' + hm(tc(2, image(l, 2))) + '.',
-      rubrique: R.graphique,
+      rubrique: R.construireAffine,
       signatures: [sig(l)],
       controle: { ops: 3, xs: [0, 2], ys: [l.b.toString(), image(l, 2).toString()], coefs: [l.a.toString(), l.b.toString()], grad: [1, 1], calc: { genre: 'choix-param', attendu: [l.a.toString(), l.b.toString()], contexte: { a: l.a.toString(), b: l.b.toString() } } }
     };
@@ -461,8 +461,8 @@
         { valeur: l.b, message: E.penteB }
       ],
       etapes: [
-        { texte: 'Variation de y (de A à B).', calcul: hm('y₂ – y₁ = ' + tn(B[1]) + ' – ' + tnp(A[1]) + ' = ' + tn(dy)) },
-        { texte: 'Variation de x (de A à B, même ordre).', calcul: hm('x₂ – x₁ = ' + tn(B[0]) + ' – ' + tnp(A[0]) + ' = ' + tn(dx)) },
+        { texte: 'Différence des ordonnées (de A à B).', calcul: hm('y₂ – y₁ = ' + tn(B[1]) + ' – ' + tnp(A[1]) + ' = ' + tn(dy)) },
+        { texte: 'Différence des abscisses (de A à B, même ordre).', calcul: hm('x₂ – x₁ = ' + tn(B[0]) + ' – ' + tnp(A[0]) + ' = ' + tn(dx)) },
         { texte: 'On divise.', calcul: hm('p = ' + tn(dy) + ' : ' + tn(dx) + ' = ' + tn(p)) }
       ],
       verification: 'Contrôle : en partant de A, on avance de ' + tn(dx) + ' et on ' + (p.signe() >= 0 ? 'monte' : 'descend') + ' de ' + tn(dy.abs()) + ' : on arrive bien en B.',
@@ -534,7 +534,7 @@
       reponse: { type: 'couple', x: dd.x, y: dd.y },
       etapes: [{ texte: 'Les deux droites se coupent au point de coordonnées x = ' + dd.x + ' (axe horizontal) et y = ' + dd.y + ' (axe vertical).', calcul: hm(tc(dd.x, dd.y)) }],
       verification: 'Contrôle : ' + hm('f(' + dd.x + ') = ' + tn(image(dd.l1, dd.x))) + ' et ' + hm('g(' + dd.x + ') = ' + tn(image(dd.l2, dd.x))) + '.',
-      rubrique: R.intersection,
+      rubrique: R.graphique,
       controle: { ops: 1, xs: [dd.x], ys: [dd.y], coefs: [dd.l1.a.toString(), dd.l1.b.toString(), dd.l2.a.toString(), dd.l2.b.toString()], grad: [1, 1], calc: { genre: 'intersection', l1: [dd.l1.a.toString(), dd.l1.b.toString()], l2: [dd.l2.a.toString(), dd.l2.b.toString()] } }
     };
   }
@@ -564,7 +564,7 @@
         { texte: 'Avec g.', calcul: hm('g(' + tn(px) + ') = ' + tn(dd.l2.a) + ' · ' + tnp(px) + ' + ' + tnp(dd.l2.b) + ' = ' + tn(g2)) }
       ],
       verification: vrai ? 'Les deux images sont égales à ' + tn(py) + ' : c\'est bien le point d\'intersection.' : 'Le vrai point d\'intersection est ' + hm(tc(dd.x, dd.y)) + '. ' + E.intersection,
-      rubrique: R.intersection,
+      rubrique: R.graphique,
       controle: { ops: 2, xs: [px], ys: [py.toString()], coefs: [dd.l1.a.toString(), dd.l1.b.toString(), dd.l2.a.toString(), dd.l2.b.toString()], calc: { genre: 'choix' } }
     };
   }
@@ -585,7 +585,7 @@
         { texte: 'Vérification avec g.', calcul: hm('g(' + tn(dd.x) + ') = ' + tn(dd.l2.a) + ' · ' + tnp(dd.x) + ' + ' + tnp(dd.l2.b) + ' = ' + tn(dd.y)) }
       ],
       verification: E.intersection,
-      rubrique: R.intersection,
+      rubrique: R.graphique,
       signatures: [sigInter(dd.l1, dd.l2)],
       controle: { ops: 3, xs: [dd.x], ys: [dd.y], coefs: [dd.l1.a.toString(), dd.l1.b.toString(), dd.l2.a.toString(), dd.l2.b.toString()], grad: [1, 1], calc: { genre: 'intersection', l1: [dd.l1.a.toString(), dd.l1.b.toString()], l2: [dd.l2.a.toString(), dd.l2.b.toString()] } }
     };
@@ -611,7 +611,7 @@
         { texte: 'Le point d\'intersection est :', calcul: hm(tc(dd.x, dd.y)) }
       ],
       verification: 'Dans les autres colonnes, f(x) et g(x) sont différents : il n\'y a qu\'un seul point commun.',
-      rubrique: R.intersection,
+      rubrique: R.graphique,
       signatures: [sigInter(dd.l1, dd.l2)],
       controle: { ops: 4, xs: [dd.x], ys: [dd.y], coefs: [dd.l1.a.toString(), dd.l1.b.toString(), dd.l2.a.toString(), dd.l2.b.toString()], calc: { genre: 'intersection', l1: [dd.l1.a.toString(), dd.l1.b.toString()], l2: [dd.l2.a.toString(), dd.l2.b.toString()] } }
     };
@@ -638,7 +638,7 @@
         { texte: 'y est la valeur de g.', calcul: hm('y = ' + tn(c)) }
       ],
       verification: 'Vérification dans les DEUX fonctions : ' + hm('f(' + tn(x0) + ') = ' + tn(image(l, x0))) + ' et ' + hm('g(' + tn(x0) + ') = ' + tn(c)) + '.',
-      rubrique: R.intersection,
+      rubrique: R.equations,
       controle: { ops: 3, xs: [x0], ys: [c.toString()], coefs: [a.toString(), b.toString(), '0', c.toString()], calc: { genre: 'intersection', l1: [a.toString(), b.toString()], l2: ['0', c.toString()] } }
     };
   }
@@ -661,7 +661,7 @@
         { texte: 'On calcule y avec f.', calcul: hm('y = f(' + tn(dd.x) + ') = ' + tn(dd.y)) }
       ],
       verification: 'Vérification dans l\'autre fonction : ' + hm('g(' + tn(dd.x) + ') = ' + tn(image(l2, dd.x))) + '. ' + E.intersection,
-      rubrique: R.intersection,
+      rubrique: R.equations,
       signatures: [sigInter(l1, l2)],
       controle: { ops: 4, xs: [dd.x], ys: [dd.y], coefs: [l1.a.toString(), l1.b.toString(), l2.a.toString(), l2.b.toString()], calc: { genre: 'intersection', l1: [l1.a.toString(), l1.b.toString()], l2: [l2.a.toString(), l2.b.toString()] } }
     };
@@ -690,7 +690,7 @@
         { texte: 'On calcule y.', calcul: hm('y = f(' + tn(x) + ') = ' + tn(y)) }
       ],
       verification: 'Vérification : ' + hm('g(' + tn(x) + ') = ' + tn(image(l2, x))) + ', c\'est cohérent avec la lecture du graphique.',
-      rubrique: R.intersection,
+      rubrique: R.equations,
       controle: { ops: 4, xs: [x.toString()], ys: [y.toString()], coefs: [l1.a.toString(), l1.b.toString(), l2.a.toString(), l2.b.toString()], grad: [1, 1], calc: { genre: 'intersection', l1: [l1.a.toString(), l1.b.toString()], l2: [l2.a.toString(), l2.b.toString()] } }
     };
   }
@@ -814,7 +814,7 @@
           { texte: 'On multiplie.', calcul: hm(tn(dist / 100) + ' · ' + p + ' = ' + tn(den) + ' m') }
         ],
         verification: 'Contrôle : ' + hm(tn(den) + ' : ' + dist + ' = ' + tn(val(p).divise(100))) + ' = ' + p + ' %.',
-        rubrique: R.pente,
+        rubrique: R.penteTerrain,
         controle: { ops: 2, xs: [], ys: [], coefs: [p], calc: { genre: 'formule', formule: p + '*' + dist + '/100' } }
       };
     }
@@ -830,7 +830,7 @@
         { texte: 'En pour cent.', calcul: hm(tn(val(p).divise(100)) + ' = ' + p + ' %') }
       ],
       verification: 'Contrôle : ' + p + ' m pour 100 m, donc ' + hm(p + ' · ' + tn(dist / 100) + ' = ' + tn(den)) + ' m pour ' + dist + ' m.',
-      rubrique: R.pente,
+      rubrique: R.penteTerrain,
       controle: { ops: 3, xs: [], ys: [], coefs: [p], calc: { genre: 'formule', formule: den + '/' + dist + '*100' } }
     };
   }
@@ -857,14 +857,14 @@
     } else if (d === 3) {
       k = val(alea.choix(['1.5', '0.5', '2.5']));
       var L2 = L * 2, l2 = l * 2;
-      enonce = '<p>Une figure a un côté de ' + L2 + ' cm et un autre de ' + l2 + ' cm. On la ' + (k.valeur() < 1 ? 'réduit' : 'agrandit') + ' avec le coefficient ' + tn(k) + '.</p><p>Quelle est la somme des deux nouvelles longueurs ?</p>';
+      enonce = '<p>Une figure a un côté de ' + L2 + ' cm et un autre de ' + l2 + ' cm. On la ' + (k.valeur() < 1 ? 'réduit' : 'agrandit') + ' avec le facteur ' + tn(k) + '.</p><p>Quelle est la somme des deux nouvelles longueurs ?</p>';
       valeur = k.fois(L2 + l2);
       etapes = [
         { texte: 'Premier côté.', calcul: hm(L2 + ' · ' + tn(k) + ' = ' + tn(k.fois(L2))) },
         { texte: 'Deuxième côté.', calcul: hm(l2 + ' · ' + tn(k) + ' = ' + tn(k.fois(l2))) },
         { texte: 'Somme.', calcul: hm(tn(k.fois(L2)) + ' + ' + tn(k.fois(l2)) + ' = ' + tn(valeur)) }
       ];
-      pieges = [{ valeur: k.plus(L2).plus(k).plus(l2), message: 'Le coefficient multiplie les longueurs, il ne s\'ajoute pas.' }, { valeur: val(L2 + l2), message: 'Tu as oublié d\'appliquer le coefficient.' }];
+      pieges = [{ valeur: k.plus(L2).plus(k).plus(l2), message: 'Le facteur multiplie les longueurs, il ne s\'ajoute pas.' }, { valeur: val(L2 + l2), message: 'Tu as oublié d\'appliquer le facteur.' }];
       formule = k.valeur() + '*(' + L2 + '+' + l2 + ')'; ops = 3;
     } else {
       k = alea.choix([2, 3]);
@@ -883,7 +883,7 @@
     return {
       type: d >= 4 ? 'probleme' : 'directe',
       enonce: enonce,
-      indice: 'Agrandir ou réduire : toutes les longueurs sont multipliées par le même coefficient.',
+      indice: 'Agrandir ou réduire : toutes les longueurs sont multipliées par le même facteur.',
       reponse: { type: 'nombre', valeur: valeur, unite: unite }, suffixe: unite,
       pieges: pieges,
       etapes: etapes,
@@ -921,23 +921,23 @@
   }
 
   /* =====================================================================
-   * B5 : diagrammes circulaires et en barres
+   * B5 : diagrammes circulaires et en colonnes
    * ===================================================================== */
   var TRANSPORTS = ['à pied', 'vélo', 'bus', 'voiture', 'trottinette'];
   var DECHETS = ['papier', 'PET', 'compost', 'verre', 'alu'];
 
-  /** D1 — lire une barre. */
+  /** D1 — lire une colonne. */
   function genLireBarres(alea, d) {
     var cats = alea.melanger(TRANSPORTS).slice(0, 4), vals = cats.map(function () { return alea.entier(1, 12); });
     var i = alea.entier(0, 3);
-    var def = { categories: cats, valeurs: vals, max: 14, pas: 1, lpas: 2, titreY: 'nombre d\'élèves', description: 'Diagramme en barres des moyens de transport' };
+    var def = { categories: cats, valeurs: vals, max: 14, pas: 1, lpas: 2, titreY: 'nombre d\'élèves', description: 'Diagramme en colonnes des moyens de transport' };
     return {
       type: 'lecture',
       enonce: '<p>Le diagramme montre comment les élèves d\'une classe viennent au collège.</p>' + FICTIF + O.svgBarres(def) + '<p>Combien d\'élèves viennent ' + (cats[i] === 'à pied' ? 'à pied' : 'en ' + cats[i]) + ' ?</p>',
-      indice: 'Lis la hauteur de la barre sur l\'axe vertical. Un carreau vaut 1 élève.',
+      indice: 'Lis la hauteur de la colonne sur l\'axe vertical. Un carreau vaut 1 élève.',
       reponse: { type: 'nombre', valeur: vals[i] },
       pieges: [],
-      etapes: [{ texte: 'On lit la hauteur de la barre « ' + cats[i] + ' » sur l\'axe vertical.', calcul: hm(vals[i] + ' élèves') }],
+      etapes: [{ texte: 'On lit la hauteur de la colonne « ' + cats[i] + ' » sur l\'axe vertical.', calcul: hm(vals[i] + ' élèves') }],
       verification: '',
       rubrique: R.diagrammes,
       controle: { ops: 1, xs: [], ys: vals, coefs: [], grad: [1, 1], calc: { genre: 'formule', formule: String(vals[i]) } }
@@ -969,7 +969,7 @@
     };
   }
 
-  /** D2 — différence entre deux barres. */
+  /** D2 — différence entre deux colonnes. */
   function genDifferenceBarres(alea, d) {
     var mois = ['mars', 'avril', 'mai', 'juin', 'juillet'];
     var vals = mois.map(function () { return alea.entier(4, 24) * 2; });
@@ -979,11 +979,11 @@
     return {
       type: 'lecture',
       enonce: '<p>Le diagramme donne la production d\'énergie d\'un panneau solaire test sur le toit de l\'école (label Eco-School), en kWh.</p>' + FICTIF + O.svgBarres(def) + '<p>Combien de kWh de plus a-t-on produit en ' + (vals[i] > vals[j] ? mois[i] : mois[j]) + ' qu\'en ' + (vals[i] > vals[j] ? mois[j] : mois[i]) + ' ?</p>',
-      indice: 'Lis les deux barres (un carreau vaut 2 kWh), puis soustrais.',
+      indice: 'Lis les deux colonnes (un carreau vaut 2 kWh), puis soustrais.',
       reponse: { type: 'nombre', valeur: Math.abs(vals[i] - vals[j]), unite: 'kWh' }, suffixe: 'kWh',
       pieges: [{ valeur: Math.max(vals[i], vals[j]), message: 'C\'est la production d\'un seul mois : calcule la différence.' }],
       etapes: [
-        { texte: 'On lit les deux barres.', calcul: hm(mois[i] + ' : ' + vals[i] + ' kWh ; ' + mois[j] + ' : ' + vals[j] + ' kWh') },
+        { texte: 'On lit les deux colonnes.', calcul: hm(mois[i] + ' : ' + vals[i] + ' kWh ; ' + mois[j] + ' : ' + vals[j] + ' kWh') },
         { texte: 'On soustrait.', calcul: hm(Math.max(vals[i], vals[j]) + ' – ' + Math.min(vals[i], vals[j]) + ' = ' + Math.abs(vals[i] - vals[j]) + ' kWh') }
       ],
       verification: '',
@@ -1017,7 +1017,7 @@
     };
   }
 
-  /** D3 — pourcentage d'une catégorie dans un diagramme en barres. */
+  /** D3 — pourcentage d'une catégorie dans un diagramme en colonnes. */
   function genPourcentageBarres(alea, d) {
     var cats = alea.melanger(['football', 'unihockey', 'natation', 'danse', 'escalade']).slice(0, 4);
     var vals;
@@ -1029,7 +1029,7 @@
     return {
       type: 'probleme',
       enonce: '<p>Sport préféré des élèves d\'un groupe.</p>' + FICTIF + O.svgBarres(def) + '<p>Quel pourcentage des élèves préfère « ' + cats[i] + ' » ?</p>',
-      indice: 'Calcule d\'abord le nombre total d\'élèves (additionne toutes les barres).',
+      indice: 'Calcule d\'abord le nombre total d\'élèves (additionne toutes les colonnes).',
       reponse: { type: 'nombre', valeur: pc, unite: '%' }, suffixe: '%',
       pieges: [{ valeur: vals[i], message: 'C\'est le nombre d\'élèves : divise-le par le total, puis écris-le en %.' }],
       etapes: [
@@ -1248,7 +1248,7 @@
         { texte: ent ? 'Pour x = ' + tn(x) + ', les prix sont égaux ; A est strictement moins chère à partir de ' + n + '.' : 'x n\'est pas entier : on arrondit vers le haut, ' + n + ' ' + o.unite + '.' }
       ],
       verification: 'Vérification : ' + hm('A(' + n + ') = ' + tn(image(o.A, n)) + ' < B(' + n + ') = ' + tn(image(o.B, n))) + ', mais ' + hm('A(' + (n - 1) + ') = ' + tn(image(o.A, n - 1)) + ' ⩾ B(' + (n - 1) + ') = ' + tn(image(o.B, n - 1))) + '.',
-      rubrique: R.intersection,
+      rubrique: R.equations,
       signatures: [o.signature],
       controle: { ops: 4, xs: [n], ys: [], coefs: [o.A.a.toString(), o.A.b.toString(), o.B.a.toString(), o.B.b.toString()], calc: { genre: 'offres', A: [o.A.a.toString(), o.A.b.toString()], B: [o.B.a.toString(), o.B.b.toString()] } }
     };
@@ -1278,7 +1278,7 @@
         { texte: 'Après ce point, la droite de A est en dessous : A devient moins chère.' }
       ],
       verification: '',
-      rubrique: R.intersection,
+      rubrique: R.graphique,
       signatures: [o.signature],
       controle: { ops: 3, xs: [x.toString()], ys: [y.toString()], coefs: [o.A.a.toString(), o.A.b.toString()], calc: { genre: 'choix' } }
     };
@@ -1447,7 +1447,7 @@
         { type: 'probleme', dMin: 2, dMax: 3, gen: genPenteRoute },
         { type: 'vraifaux', dMin: 4, dMax: 4, gen: genHausseBaisse }
       ] },
-    { id: 'B5', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', theme: 'FA 10.1', titre: 'Lire et réaliser un diagramme circulaire ou en barres',
+    { id: 'B5', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', theme: 'FA 10.1', titre: 'Lire et réaliser un diagramme circulaire ou en colonnes',
       modeles: [
         { type: 'lecture', dMin: 1, dMax: 1, gen: genLireBarres },
         { type: 'lecture', dMin: 2, dMax: 2, gen: genLireCirculaire },

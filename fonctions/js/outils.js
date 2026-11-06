@@ -37,23 +37,37 @@
    * Rubriques de l'aide-mémoire. À VÉRIFIER par l'enseignante : intitulés
    * exacts de l'édition 2024. Tout est regroupé ici pour les corriger d'un coup.
    * ===================================================================== */
+  /* Noms des rubriques de l'aide-mémoire (MER), vérifiés sur l'aide-mémoire de l'enseignante :
+   * seuls les noms sont repris, jamais le contenu. « Équations » : nom de la partie, rubrique
+   * précise à confirmer (pages non lisibles dans la copie disponible). Pas de rubrique pour la
+   * fonction exponentielle dans l'aide-mémoire. */
   var RUBRIQUES = {
-    fonction: 'Fonction',
-    tableau: 'Tableau de valeurs',
-    graphique: 'Graphique d\'une fonction',
-    expression: 'Expression fonctionnelle',
+    fonction: 'Fonctions – Généralités',
+    tableau: 'Définir une fonction',
+    expression: 'Définir une fonction',
+    graphique: 'Représentation graphique',
     proportionnalite: 'Proportionnalité',
+    problemeProportionnalite: 'Résoudre un problème de proportionnalité',
     vitesse: 'Vitesse moyenne',
+    masseVolumique: 'Masse volumique',
+    debit: 'Débit',
     affine: 'Fonction affine',
-    lineaire: 'Fonction linéaire',
-    constante: 'Fonction constante',
-    pente: 'Pente d\'une droite',
-    intersection: 'Intersection de deux droites',
+    lineaire: 'Cas particuliers de la fonction affine',
+    constante: 'Cas particuliers de la fonction affine',
+    pente: 'Pente de la droite représentant une fonction affine',
+    penteGraphique: 'Déterminer la pente d\'une droite à partir de sa représentation graphique',
+    expressionGraphique: 'Déterminer l\'expression fonctionnelle d\'une fonction affine à partir de sa représentation graphique',
+    construireAffine: 'Construire la représentation graphique d\'une fonction affine',
+    penteTerrain: 'Pente',
+    equations: 'Équations',
     pourcentage: 'Pourcentage',
     echelle: 'Échelle',
-    agrandissement: 'Agrandissement et réduction',
+    agrandissement: 'Échelle',
     diagrammes: 'Diagrammes',
-    quadratique: 'Fonction quadratique'
+    quadratique: 'Fonction quadratique',
+    cubique: 'Fonction cubique',
+    racineCarree: 'Fonction racine carrée',
+    homographique: 'Fonction homographique'
   };
 
   /* =====================================================================
@@ -72,7 +86,7 @@
     penteB: 'La pente n\'est pas l\'ordonnée à l\'origine : la pente dit de combien f(x) change quand x augmente de 1.',
     penteSigne: 'Attention au signe de la pente : si la droite descend (de gauche à droite), la pente est négative.',
     penteOrdre: 'Garde le même ordre des points en haut et en bas : p = (y₂ – y₁) : (x₂ – x₁).',
-    penteInverse: 'Tu as calculé (x₂ – x₁) : (y₂ – y₁) : la pente est la variation de y DIVISÉE par la variation de x.',
+    penteInverse: 'Tu as calculé (x₂ – x₁) : (y₂ – y₁) : la pente est la différence des ordonnées DIVISÉE par la différence des abscisses.',
     affineOrigine: 'Une droite affine avec b ≠ 0 ne passe pas par l\'origine : f(0) = b.',
     intersection: 'Le point d\'intersection doit vérifier LES DEUX expressions : contrôle aussi avec l\'autre fonction.'
   };
