@@ -105,6 +105,10 @@
     var min = Infinity;
     modeles.forEach(function (m) { min = Math.min(min, typesUtilises[m.gen.name] || 0); });
     var modele = alea.choix(modeles.filter(function (m) { return (typesUtilises[m.gen.name] || 0) === min; }));
+    // modèle d'une autre difficulté (aucun à la difficulté demandée) : on annonce la difficulté réelle
+    if (modele.dMin && p < modele.dMin) p = modele.dMin;
+    if (modele.dMax && p > modele.dMax) p = modele.dMax;
+    c2.difficulte = p;
     var q, essais = 0;
     for (;;) {
       try {

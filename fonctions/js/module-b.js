@@ -1129,6 +1129,29 @@
     };
   }
 
+  /** D1 — b = 0 : affine linéaire ; a = 0 : affine constante (nature à partir des coefficients). */
+  function genCoefficientNul(alea, d) {
+    var type = alea.choix(['lineaire', 'constante', 'affine']);
+    var a = type === 'constante' ? 0 : alea.choix([-3, -2, 2, 3, 4]);
+    var b = type === 'lineaire' ? 0 : alea.choix([-4, -1, 1, 3, 5]);
+    var texte = {
+      lineaire: 'b = 0 : f(x) = ' + tn(val(a)) + 'x, sans nombre ajouté. C\'est une fonction affine linéaire : sa droite passe par l\'origine (0 ; 0).',
+      constante: 'a = 0 : x disparaît, f(x) = ' + tn(val(b)) + ' pour tout x. C\'est une fonction affine constante : sa droite est horizontale.',
+      affine: 'a ≠ 0 et b ≠ 0 : c\'est une fonction affine, ni linéaire ni constante. Sa droite coupe l\'axe vertical en ' + tc(0, val(b)) + '.'
+    }[type];
+    return {
+      type: 'choix',
+      enonce: '<p>Une fonction s\'écrit ' + hm('f(x) = ax + b') + ' avec ' + hm('a = ' + tn(val(a))) + ' et ' + hm('b = ' + tn(val(b))) + '.</p><p>Quelle est la nature de cette fonction ?</p>',
+      consigne: 'Choisis le nom le plus précis.',
+      indice: 'Regarde si a ou b vaut 0. b = 0 : rien n\'est ajouté. a = 0 : x disparaît.',
+      reponse: { type: 'choix' }, choix: O.melanger(alea, choixNoms(type).filter(function (c) { return c.param !== 'parabole'; })),
+      etapes: [{ texte: 'On remplace a et b dans ax + b.', calcul: hf(O.srcAffine(a, b)) }, { texte: texte }],
+      verification: '',
+      rubrique: type === 'affine' ? R.affine : R[type],
+      controle: { ops: 1, xs: [], ys: [], coefs: [a, b], calc: { genre: 'choix-nom', fonction: { a: String(a), b: String(b) } } }
+    };
+  }
+
   /** D2 — que devient le graphique quand a ou b change ? (affine, linéaire, constante) */
   function genChangementCoefficient(alea, d) {
     var cas = alea.choix(['b+', 'a+', 'a0', 'b0']);
@@ -1457,14 +1480,19 @@
         { type: 'probleme', dMin: 4, dMax: 4, gen: genCompleterCirculaire },
         { type: 'erreur', dMin: 4, dMax: 4, gen: genErreurDiagramme }
       ] },
-    { id: 'B6', module: 'B', annee: 10, niveaux: [2], statut: 'evalue', theme: 'FA 10.1', titre: 'Interpréter les coefficients : a et b de ax + b (situations, offres), a de ax²',
+    { id: 'B6', module: 'B', annee: 10, niveaux: [2], statut: 'evalue', theme: 'FA 10.1', titre: 'Interpréter les coefficients : a = 0, b = 0, sens de a et b dans ax + b, a de ax²',
       modeles: [
+        { type: 'choix', dMin: 1, dMax: 1, gen: genCoefficientNul },
         { type: 'choix', dMin: 1, dMax: 1, gen: genSensCoefficients },
         { type: 'choix', dMin: 2, dMax: 2, gen: genChangementCoefficient },
-        { type: 'probleme', dMin: 3, dMax: 3, gen: genTrouverAB },
         { type: 'choix', dMin: 3, dMax: 3, gen: genSensAParabole },
-        { type: 'probleme', dMin: 4, dMax: 4, gen: genComparerOffres },
         { type: 'raconte', dMin: 4, dMax: 4, gen: genSensIntersection }
+      ] },
+    // Prolongement (décision de l'enseignante) : trouver a et b demande un calcul de pente (11e)
+    { id: 'B8', module: 'B', annee: 10, niveaux: [2], statut: 'plusLoin', theme: 'FA 10.1', titre: 'Pour aller plus loin : trouver a et b à partir de deux prix, comparer des offres',
+      modeles: [
+        { type: 'probleme', dMin: 3, dMax: 3, gen: genTrouverAB },
+        { type: 'probleme', dMin: 4, dMax: 4, gen: genComparerOffres }
       ] },
     { id: 'B7', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', plusLoinN1: [10, 11], theme: 'FA 10.1', titre: 'Tracer x² et – x² avec un tableau de valeurs',
       modeles: [
