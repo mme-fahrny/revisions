@@ -64,16 +64,18 @@
   /* =====================================================================
    * B1 : identifier et nommer (droite linéaire, affine, constante, parabole)
    * ===================================================================== */
-  var NOMS = { lineaire: 'linéaire', affine: 'affine', constante: 'constante', parabole: 'parabole' };
+  // Noms les plus précis (vocabulaire de la classe) : affine linéaire, affine constante, affine.
+  var NOMS = { lineaire: 'affine linéaire', affine: 'affine', constante: 'affine constante', parabole: 'parabole' };
+  var NOMS_CHOIX = { lineaire: 'fonction affine linéaire', affine: 'fonction affine', constante: 'fonction affine constante', parabole: 'fonction dont le graphique est une parabole' };
   var EXPLICATION = {
-    lineaire: 'La droite passe par l\'origine (0 ; 0) : c\'est une droite linéaire, f(x) = ax.',
-    affine: 'La droite ne passe pas par l\'origine et n\'est pas horizontale : c\'est une droite affine, f(x) = ax + b avec b ≠ 0. ' + E.affineOrigine,
-    constante: 'La droite est horizontale : f(x) a toujours la même valeur. C\'est une droite constante, f(x) = b.',
-    parabole: 'Ce n\'est pas une droite : la courbe est une parabole (par exemple f(x) = x² ou f(x) = – x²).'
+    lineaire: 'Le graphique est une droite qui passe par l\'origine (0 ; 0) : c\'est une fonction affine linéaire, f(x) = ax.',
+    affine: 'Le graphique est une droite qui ne passe pas par l\'origine et n\'est pas horizontale : c\'est une fonction affine, f(x) = ax + b avec b ≠ 0. ' + E.affineOrigine,
+    constante: 'Le graphique est une droite horizontale : f(x) a toujours la même valeur. C\'est une fonction affine constante, f(x) = b.',
+    parabole: 'Le graphique n\'est pas une droite : c\'est une parabole (par exemple f(x) = x² ou f(x) = – x²).'
   };
-  function choixNoms(juste, prefixe) {
+  function choixNoms(juste) {
     return ['lineaire', 'affine', 'constante', 'parabole'].map(function (t) {
-      return { h: (prefixe && t !== 'parabole' ? prefixe + ' ' : '') + NOMS[t], juste: t === juste, param: t, message: t === juste ? '' : EXPLICATION[juste] };
+      return { h: NOMS_CHOIX[t], juste: t === juste, param: t, message: t === juste ? '' : EXPLICATION[juste] };
     });
   }
   function tirerFonctionType(alea, type) {
@@ -91,10 +93,10 @@
     var g = repere([{ src: srcType(f) }], { ymin: -8, ymax: 10, description: 'Courbe d\'une fonction dans un repère' });
     return {
       type: 'choix',
-      enonce: '<p>Voici le graphique d\'une fonction f.</p>' + O.graphiqueHtml(g) + '<p>Comment nomme-t-on ce graphique ?</p>',
+      enonce: '<p>Voici le graphique d\'une fonction f.</p>' + O.graphiqueHtml(g) + '<p>Quelle fonction ce graphique représente-t-il ?</p>',
       consigne: 'Choisis le nom le plus précis.',
-      indice: 'Est-ce une droite ? Si oui : passe-t-elle par l\'origine (0 ; 0) ? Est-elle horizontale ?',
-      reponse: { type: 'choix' }, choix: O.melanger(alea, choixNoms(type, 'droite')),
+      indice: 'Est-ce une droite ? Si oui : passe-t-elle par l\'origine (0 ; 0) (affine linéaire) ? Est-elle horizontale (affine constante) ?',
+      reponse: { type: 'choix' }, choix: O.melanger(alea, choixNoms(type)),
       etapes: [{ texte: EXPLICATION[type] }],
       verification: type === 'parabole' ? '' : 'Contrôle : le graphique coupe l\'axe vertical au point ' + hm(tc(0, f.b)) + '.',
       rubrique: type === 'parabole' ? R.quadratique : R[type === 'lineaire' ? 'lineaire' : type === 'constante' ? 'constante' : 'affine'],
@@ -110,10 +112,10 @@
     return {
       type: 'choix',
       enonce: '<p>Quelle est la nature de la fonction suivante ?</p><p class="calcul">' + hf(srcType(f)) + '</p>',
-      consigne: 'Choisis le nom le plus précis de son graphique.',
-      indice: 'f(x) = ax : linéaire. f(x) = ax + b avec b ≠ 0 : affine. f(x) = b : constante. Avec x² : parabole.',
-      reponse: { type: 'choix' }, choix: O.melanger(alea, choixNoms(type, 'droite')),
-      etapes: [{ texte: { lineaire: 'L\'expression est de la forme ax (pas de nombre ajouté) : droite linéaire.', affine: 'L\'expression est de la forme ax + b avec b ≠ 0 : droite affine.', constante: 'L\'expression ne contient pas x : f(x) vaut toujours ' + (f.b ? tn(f.b) : '') + ', droite constante (horizontale).', parabole: 'L\'expression contient x² : le graphique est une parabole.' }[type] }],
+      consigne: 'Choisis le nom le plus précis.',
+      indice: 'f(x) = ax : affine linéaire. f(x) = ax + b avec b ≠ 0 : affine. f(x) = b : affine constante. Avec x² : parabole.',
+      reponse: { type: 'choix' }, choix: O.melanger(alea, choixNoms(type)),
+      etapes: [{ texte: { lineaire: 'L\'expression est de la forme ax (pas de nombre ajouté) : fonction affine linéaire, son graphique passe par l\'origine.', affine: 'L\'expression est de la forme ax + b avec b ≠ 0 : fonction affine.', constante: 'L\'expression ne contient pas x : f(x) vaut toujours ' + (f.b ? tn(f.b) : '') + ', fonction affine constante (droite horizontale).', parabole: 'L\'expression contient x² : le graphique est une parabole.' }[type] }],
       verification: '',
       rubrique: type === 'parabole' ? R.quadratique : R[type === 'lineaire' ? 'lineaire' : type === 'constante' ? 'constante' : 'affine'],
       controle: { ops: 1, xs: [], ys: [], coefs: f.carre ? [f.carre] : [f.a.toString(), f.b.toString()], calc: { genre: 'choix-nom', fonction: f.carre ? { carre: f.carre } : { a: f.a.toString(), b: f.b.toString() } } }
@@ -131,7 +133,7 @@
       enonce = '« Le graphique de ' + hl(l) + ' passe par l\'origine (0 ; 0). »';
       opts = O.optionsVraiFaux(alea, {
         vrai: vrai,
-        justeVrai: hm('f(0) = ' + tn(a) + ' · 0 = 0') + ' : la droite est linéaire.',
+        justeVrai: hm('f(0) = ' + tn(a) + ' · 0 = 0') + ' : la fonction est affine linéaire.',
         justeFaux: hm('f(0) = ' + tn(a) + ' · 0 + ' + tnp(b) + ' = ' + tn(b)) + ' : la droite passe par ' + hm(tc(0, b)) + ', pas par l\'origine.',
         autresVrai: ['toutes les droites passent par l\'origine.', 'le coefficient de x est positif.'],
         autresFaux: ['le coefficient de x n\'est pas 1.', 'une droite ne passe jamais par l\'origine.'],
@@ -148,7 +150,7 @@
         justeVrai: 'pour x = 0, ' + hm('f(0) = ' + tn(b)) + ' : c\'est l\'ordonnée à l\'origine.',
         justeFaux: hm('f(' + tn(px) + ') = ' + tn(fpx)) + ' et non 0. Le point sur l\'axe vertical est ' + hm(tc(0, b)) + '.',
         autresVrai: ['b = ' + tn(b) + ' se place sur l\'axe horizontal.', 'les deux coordonnées contiennent le nombre ' + tn(b) + '.'],
-        autresFaux: ['un point d\'une droite affine n\'a jamais de coordonnée nulle.', 'le coefficient de x vaut ' + tn(a) + '.'],
+        autresFaux: ['un point d\'une fonction affine n\'a jamais de coordonnée nulle.', 'le coefficient de x vaut ' + tn(a) + '.'],
         messageFaux: E.inverse + ' L\'ordonnée à l\'origine b donne le point (0 ; b).'
       });
       etapes = [{ texte: 'On calcule l\'image de l\'abscisse du point.', calcul: hm('f(' + tn(px) + ') = ' + tn(a) + ' · ' + tnp(px) + ' + ' + tnp(b) + ' = ' + tn(fpx)) }, { texte: vrai ? 'On trouve bien ' + tn(py) + '.' : 'On trouve ' + tn(fpx) + ', pas ' + tn(py) + '.' }];
@@ -178,14 +180,14 @@
     var dif = ys.slice(1).map(function (y, i) { return val(y).moins(val(ys[i])); });
     return {
       type: 'tableau',
-      enonce: '<p>Voici le tableau de valeurs d\'une fonction f.</p>' + O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: ys }]) + '<p>Quel est son graphique ?</p>',
+      enonce: '<p>Voici le tableau de valeurs d\'une fonction f.</p>' + O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: ys }]) + '<p>De quelle fonction s\'agit-il ?</p>',
       consigne: 'Choisis le nom le plus précis.',
       indice: 'Quand x augmente toujours du même pas, f(x) change-t-il toujours de la même quantité ? Que vaut f(0) ?',
-      reponse: { type: 'choix' }, choix: O.melanger(alea, choixNoms(type, 'droite')),
+      reponse: { type: 'choix' }, choix: O.melanger(alea, choixNoms(type)),
       etapes: [
         { texte: 'On regarde de combien f(x) change d\'une colonne à la suivante.', calcul: hm(dif.map(tn).join(' ; ')) },
         { texte: type === 'parabole' ? 'Les variations ne sont pas toutes égales : ce n\'est pas une droite.' : 'Les variations sont toutes égales : c\'est une droite.' },
-        { texte: type === 'parabole' ? 'Les valeurs sont symétriques (f(– 2) = f(2)) : c\'est une parabole.' : type === 'constante' ? 'f(x) ne change pas : droite constante.' : type === 'lineaire' ? 'f(0) = 0 : la droite passe par l\'origine, elle est linéaire.' : 'f(0) = ' + tn(b) + ' ≠ 0 : la droite est affine.' }
+        { texte: type === 'parabole' ? 'Les valeurs sont symétriques (f(– 2) = f(2)) : c\'est une parabole.' : type === 'constante' ? 'f(x) ne change pas : fonction affine constante.' : type === 'lineaire' ? 'f(0) = 0 : la droite passe par l\'origine, c\'est une fonction affine linéaire.' : 'f(0) = ' + tn(b) + ' ≠ 0 : c\'est une fonction affine (non linéaire).' }
       ],
       verification: '',
       rubrique: R.tableau,
@@ -219,7 +221,7 @@
     choix.push({ h: 'Les trois classements sont justes.', juste: toutJuste, message: toutJuste ? '' : 'Un classement est faux : récris chaque expression sous la forme ax + b (ou avec x²).' });
     return {
       type: 'erreur',
-      enonce: '<p>' + nom + ' classe ces fonctions (linéaire, affine, constante ou parabole).</p><p>Quel classement est faux ? (Il se peut qu\'ils soient tous justes.)</p>',
+      enonce: '<p>' + nom + ' classe ces fonctions (affine linéaire, affine constante, affine ou parabole).</p><p>Quel classement est faux ? (Il se peut qu\'ils soient tous justes.)</p>',
       indice: 'Récris chaque expression sous la forme la plus simple : ax, ax + b, b ou avec x².',
       reponse: { type: 'choix' }, choix: choix,
       etapes: affirm.map(function (af) { return { texte: hm(af.f.h) + ' : ' + af.f.pourquoi + ' → ' + NOMS[af.f.type] + (af.dit === af.f.type ? ' (juste).' : ' (' + nom + ' a écrit « ' + NOMS[af.dit] + ' »).') }; }),
@@ -274,7 +276,7 @@
       reponse: { type: 'nombre', valeur: a * x0 },
       pieges: [{ valeur: a + x0, message: a + 'x signifie ' + a + ' · x : il faut multiplier.' }],
       etapes: [{ texte: 'On remplace x par ' + x0 + '.', calcul: hm('f(' + x0 + ') = ' + a + ' · ' + x0 + ' = ' + (a * x0)) }],
-      verification: 'Le point ' + hm(tc(x0, a * x0)) + ' est sur la droite linéaire, qui passe aussi par (0 ; 0).',
+      verification: 'Le point ' + hm(tc(x0, a * x0)) + ' est sur la droite de cette fonction affine linéaire, qui passe aussi par (0 ; 0).',
       rubrique: R.lineaire,
       controle: { ops: 1, xs: [x0], ys: [a * x0], coefs: [a, 0], calc: { genre: 'valeur', a: a, b: 0, x: x0 } }
     };
@@ -317,10 +319,10 @@
     var g = repere([{ src: src(l) }], { points: pts, description: 'Droite passant par deux points marqués' });
     return {
       type: 'lecture',
-      enonce: '<p>Voici le graphique d\'une fonction affine f. Les points A et B sont sur la droite.</p>' + O.graphiqueHtml(g) + '<p>Écris l\'expression fonctionnelle de f.</p>',
+      enonce: '<p>Voici le graphique d\'une fonction affine f. Les points A et B, sur la droite, peuvent t\'aider.</p>' + O.graphiqueHtml(g) + '<p>Écris l\'expression fonctionnelle de f.</p>',
       consigne: 'Écris seulement le membre de droite, par exemple 2x – 3.',
       prefixe: 'f(x) =',
-      indice: 'b est l\'ordonnée du point où la droite coupe l\'axe vertical. La pente : de combien la droite monte (ou descend) quand on avance de 1 vers la droite ?',
+      indice: 'Lis quelques points du graphique et écris-les dans un tableau de valeurs (x ; f(x)). Que vaut f(0) ? De combien f(x) change-t-il quand x augmente de 1 ?',
       reponse: { type: 'expr', attendu: src(l) },
       pieges: [
         { src: O.srcAffine(l.b, l.a), message: E.ordonneePente },
@@ -328,10 +330,10 @@
         { src: O.srcAffine(l.a, l.b.oppose()), message: 'Attention au signe de b : la droite coupe l\'axe vertical en ' + hm(tc(0, l.b)) + '.' }
       ],
       etapes: [
-        { texte: 'Ordonnée à l\'origine : la droite coupe l\'axe vertical au point A' + hm(tc(0, l.b)) + '.', calcul: hm('b = ' + tn(l.b)) },
-        { texte: 'Pente : de A à B, on avance de ' + pas + ' et f(x) change de ' + tn(l.a.fois(pas)) + '.', calcul: hm('a = ' + tn(l.a.fois(pas)) + ' : ' + pas + ' = ' + tn(l.a)) },
+        { texte: 'On lit des points du graphique et on les écrit dans un tableau de valeurs.', calcul: O.tableauHtml([{ entete: 'x', valeurs: [0, pas, 2 * pas] }, { entete: 'f(x)', valeurs: [l.b, image(l, pas), image(l, 2 * pas)] }]) },
+        { texte: 'Pour x = 0, f(0) = ' + tn(l.b) + ' : c\'est le nombre ajouté. Quand x augmente de ' + pas + ', f(x) change de ' + tn(l.a.fois(pas)) + (pas > 1 ? ', donc de ' + tn(l.a) + ' quand x augmente de 1' : '') + ' : c\'est le nombre qui multiplie x.', calcul: hm('f(x) = ' + tn(l.a) + ' · x + ' + tnp(l.b)) },
         { texte: 'On écrit l\'expression.', calcul: hl(l) }
-      ].slice(0, d >= 4 ? 3 : 3),
+      ],
       verification: 'Contrôle avec B : ' + hm('f(' + pas + ') = ' + tn(l.a) + ' · ' + pas + ' + ' + tnp(l.b) + ' = ' + tn(image(l, pas))) + '.',
       rubrique: R.affine,
       signatures: [sig(l)],
@@ -376,6 +378,69 @@
       x1 = alea.entier(-5, 3); x2 = x1 + pas * alea.entier(1, 2); essais++;
     } while ((Math.abs(image(l, x1).valeur()) > 9 || Math.abs(image(l, x2).valeur()) > 9 || x2 > 6 || x1 === 0) && essais < 200);
     return [[x1, image(l, x1)], [x2, image(l, x2)]];
+  }
+
+  /** D3 — du graphique au tableau de valeurs (lire trois images). */
+  function genGraphiqueVersTableau(alea, d, ctx) {
+    var l;
+    do { l = { a: tirerPente(alea, 3, ctx.niveau, { graphe: true }), b: val(alea.entier(-4, 4)) }; } while (sig(l) === 'droite:a=2:b=1');
+    var cand = [];
+    for (var x = -5; x <= 5; x++) { var y = image(l, x); if (y.estEntier() && Math.abs(y.valeur()) <= 7) cand.push(x); }
+    var xs = alea.melanger(cand).slice(0, 3).sort(function (u, v) { return u - v; });
+    var ys = xs.map(function (x) { return image(l, x); });
+    var g = repere([{ src: src(l) }], { description: 'Droite d\'une fonction affine' });
+    return {
+      type: 'lecture',
+      enonce: '<p>Voici le graphique d\'une fonction affine f.</p>' + O.graphiqueHtml(g) + '<p>Complète son tableau de valeurs.</p>' + O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: ['A', 'B', 'C'] }]),
+      consigne: 'Écris A ; B ; C.',
+      indice: 'Pour chaque x, pars de l\'axe horizontal, va (vers le haut ou vers le bas) jusqu\'à la droite, puis lis la valeur sur l\'axe vertical.',
+      reponse: { type: 'liste', valeurs: ys, noms: ['A', 'B', 'C'] },
+      pieges: [{ liste: ys.map(function (y) { return y.oppose(); }), message: 'Attention aux signes : un point sous l\'axe horizontal a une ordonnée négative.' }],
+      etapes: [
+        { texte: 'Pour chaque valeur de x, on lit l\'ordonnée du point de la droite.', calcul: hm(xs.map(function (x, i) { return 'f(' + tn(x) + ') = ' + tn(ys[i]); }).join(' ; ')) },
+        { texte: 'On contrôle la régularité : quand x augmente de 1, f(x) change toujours de ' + tn(l.a) + '.' },
+        { texte: 'On contrôle avec l\'expression de la droite.', calcul: hl(l) }
+      ],
+      verification: '',
+      rubrique: R.tableau,
+      signatures: [sig(l)],
+      controle: { ops: 3, xs: xs, ys: ys.map(String), coefs: [l.a.toString(), l.b.toString()], grad: [1, 1], calc: { genre: 'liste', a: l.a.toString(), b: l.b.toString(), xs: xs } }
+    };
+  }
+
+  /** D4 — du tableau de valeurs (x non consécutifs) à l'expression. */
+  function genTableauVersExpression(alea, d, ctx) {
+    var l, xs, essais = 0;
+    do {
+      l = { a: tirerPente(alea, 3, ctx.niveau, { graphe: true }), b: val(alea.entierNonNul(-6, 6)) };
+      if (l.a.signe() > 0 && (ctx.niveau === 2 || l.a.estEntier()) && alea.suivant() < 0.5) l.a = l.a.oppose();
+      xs = alea.melanger([-4, -2, -1, 1, 2, 3, 4, 6]).slice(0, 4).sort(function (u, v) { return u - v; });
+      essais++;
+    } while ((sig(l) === 'droite:a=2:b=1' || l.a.egal(l.b) || xs.some(function (x) { return !image(l, x).estEntier(); })) && essais < 300);
+    var ys = xs.map(function (x) { return image(l, x); });
+    var dx = xs[1] - xs[0], dy = ys[1].moins(ys[0]);
+    return {
+      type: 'tableau',
+      enonce: '<p>Voici le tableau de valeurs d\'une fonction affine f.</p>' + O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: ys }]) + '<p>Écris son expression fonctionnelle.</p>',
+      consigne: 'Écris seulement le membre de droite, par exemple 2x – 3.',
+      prefixe: 'f(x) =',
+      indice: 'Quand x augmente de ' + dx + ' (entre les deux premières colonnes), de combien f(x) change-t-il ? Déduis-en le changement pour 1, puis calcule f(0).',
+      reponse: { type: 'expr', attendu: src(l) },
+      pieges: [
+        { src: O.srcAffine(l.a, 0), message: 'Il manque le nombre ajouté : f(0) ne vaut pas 0 ici.' },
+        { src: O.srcAffine(l.b, l.a), message: 'Tu as inversé le nombre qui multiplie x et le nombre ajouté.' },
+        { src: O.srcAffine(l.a.oppose(), l.b), message: 'Attention au signe : ici, quand x augmente, f(x) ' + (l.a.signe() > 0 ? 'augmente' : 'diminue') + '.' }
+      ],
+      etapes: [
+        { texte: 'Entre les deux premières colonnes, x augmente de ' + dx + ' et f(x) change de ' + tn(dy) + '.', calcul: hm(tn(dy) + ' : ' + dx + ' = ' + tn(l.a)) },
+        { texte: 'Quand x augmente de 1, f(x) change de ' + tn(l.a) + ' : c\'est le nombre qui multiplie x. On calcule f(0) depuis la première colonne.', calcul: hm('f(0) = ' + tn(ys[0]) + ' – ' + tnp(l.a) + ' · ' + tnp(xs[0]) + ' = ' + tn(l.b)) },
+        { texte: 'On écrit l\'expression.', calcul: hl(l) }
+      ],
+      verification: 'Contrôle avec la dernière colonne : ' + hm('f(' + tn(xs[3]) + ') = ' + tn(ys[3])) + '.',
+      rubrique: R.tableau,
+      signatures: [sig(l)],
+      controle: { ops: 3, xs: xs, ys: ys.map(String), coefs: [l.a.toString(), l.b.toString()], calc: { genre: 'expr', a: l.a.toString(), b: l.b.toString() } }
+    };
   }
 
   /** D3 — calculer la pente à partir de deux points. */
@@ -504,6 +569,54 @@
     };
   }
 
+  /** D3 (N1) — lire une intersection (coordonnées négatives possibles), puis vérifier avec les deux expressions. */
+  function genIntersectionGraphique(alea, d, ctx) {
+    var dd = deuxDroites(alea, function () { return val(alea.choix([-3, -2, -1, 1, 2, 3])); }, { xmin: -4, xmax: 4, ymin: -6, ymax: 6, bmax: 7 });
+    var g = repere([{ src: src(dd.l1), nom: 'f' }, { src: src(dd.l2), nom: 'g' }], { description: 'Deux droites qui se coupent' });
+    return {
+      type: 'lecture',
+      enonce: '<p>On donne ' + hl(dd.l1, 'f') + ' et ' + hl(dd.l2, 'g') + '.</p>' + O.graphiqueHtml(g) + '<p>Lis les coordonnées du point d\'intersection, puis vérifie-les avec les deux expressions.</p>',
+      consigne: 'Écris (x ; y).',
+      indice: 'Lis x sur l\'axe horizontal, puis y sur l\'axe vertical. Contrôle : f(x) et g(x) doivent donner le même nombre.',
+      reponse: { type: 'couple', x: dd.x, y: dd.y, messageY: 'Contrôle y avec f(x) et g(x).' },
+      etapes: [
+        { texte: 'Lecture sur le graphique.', calcul: hm(tc(dd.x, dd.y)) },
+        { texte: 'Vérification avec f.', calcul: hm('f(' + tn(dd.x) + ') = ' + tn(dd.l1.a) + ' · ' + tnp(dd.x) + ' + ' + tnp(dd.l1.b) + ' = ' + tn(dd.y)) },
+        { texte: 'Vérification avec g.', calcul: hm('g(' + tn(dd.x) + ') = ' + tn(dd.l2.a) + ' · ' + tnp(dd.x) + ' + ' + tnp(dd.l2.b) + ' = ' + tn(dd.y)) }
+      ],
+      verification: E.intersection,
+      rubrique: R.intersection,
+      signatures: [sigInter(dd.l1, dd.l2)],
+      controle: { ops: 3, xs: [dd.x], ys: [dd.y], coefs: [dd.l1.a.toString(), dd.l1.b.toString(), dd.l2.a.toString(), dd.l2.b.toString()], grad: [1, 1], calc: { genre: 'intersection', l1: [dd.l1.a.toString(), dd.l1.b.toString()], l2: [dd.l2.a.toString(), dd.l2.b.toString()] } }
+    };
+  }
+
+  /** D4 (N1) — trouver l'intersection avec des tableaux de valeurs (sans graphique). */
+  function genIntersectionTableau(alea, d, ctx) {
+    var dd = deuxDroites(alea, function () { return val(alea.choix([-3, -2, -1, 1, 2, 3, 4])); }, { xmin: -2, xmax: 4, ymin: -6, ymax: 9, bmax: 9 });
+    var xs = [-2, -1, 0, 1, 2, 3, 4];
+    var trous = xs.map(function (x, i) { return i; }).filter(function (i) { return i % 2 === 1; });
+    var f = xs.map(function (x, i) { return trous.indexOf(i) >= 0 ? null : image(dd.l1, x); });
+    var g = xs.map(function (x, i) { return trous.indexOf(i) >= 0 ? null : image(dd.l2, x); });
+    return {
+      type: 'tableau',
+      enonce: '<p>On donne ' + hl(dd.l1, 'f') + ' et ' + hl(dd.l2, 'g') + '.</p><p>Complète le tableau de valeurs, puis trouve le point d\'intersection des deux droites.</p>' +
+        O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: f }, { entete: 'g(x)', valeurs: g }]),
+      consigne: 'Écris (x ; y).',
+      indice: 'Le point d\'intersection est dans la colonne où f(x) et g(x) sont égaux.',
+      reponse: { type: 'couple', x: dd.x, y: dd.y, messageY: 'Dans la bonne colonne, y est la valeur commune de f(x) et de g(x).' },
+      etapes: [
+        { texte: 'On complète le tableau.', calcul: O.tableauHtml([{ entete: 'x', valeurs: xs }, { entete: 'f(x)', valeurs: xs.map(function (x) { return image(dd.l1, x); }) }, { entete: 'g(x)', valeurs: xs.map(function (x) { return image(dd.l2, x); }) }]) },
+        { texte: 'On cherche la colonne où f(x) = g(x) : x = ' + tn(dd.x) + '.', calcul: hm('f(' + tn(dd.x) + ') = g(' + tn(dd.x) + ') = ' + tn(dd.y)) },
+        { texte: 'Le point d\'intersection est :', calcul: hm(tc(dd.x, dd.y)) }
+      ],
+      verification: 'Dans les autres colonnes, f(x) et g(x) sont différents : il n\'y a qu\'un seul point commun.',
+      rubrique: R.intersection,
+      signatures: [sigInter(dd.l1, dd.l2)],
+      controle: { ops: 4, xs: [dd.x], ys: [dd.y], coefs: [dd.l1.a.toString(), dd.l1.b.toString(), dd.l2.a.toString(), dd.l2.b.toString()], calc: { genre: 'intersection', l1: [dd.l1.a.toString(), dd.l1.b.toString()], l2: [dd.l2.a.toString(), dd.l2.b.toString()] } }
+    };
+  }
+
   /** D3 — intersection d'une droite et d'une droite constante (calcul). */
   function genIntersectionConstante(alea, d, ctx) {
     var a, x0, b, c;
@@ -572,7 +685,7 @@
       indice: 'Lis d\'abord une valeur approchée sur le graphique, puis résous f(x) = g(x).',
       reponse: { type: 'couple', x: x, y: y },
       etapes: [
-        { texte: 'Lecture approchée : x est entre ' + Math.floor(x.valeur()) + ' et ' + Math.ceil(x.valeur()) + '.' },
+        { texte: 'Lecture approchée : x est entre ' + tn(Math.floor(x.valeur())) + ' et ' + tn(Math.ceil(x.valeur())) + '.' },
         { texte: 'On résout f(x) = g(x).', calcul: hm(O.tx(src(l1)) + ' = ' + O.tx(src(l2)) + ' ; ' + tn(l1.a.moins(l2.a)) + 'x = ' + tn(l2.b.moins(l1.b)) + ' ; x = ' + tn(x)) },
         { texte: 'On calcule y.', calcul: hm('y = f(' + tn(x) + ') = ' + tn(y)) }
       ],
@@ -673,7 +786,7 @@
     return {
       type: 'probleme',
       enonce: enonce + FICTIF,
-      indice: 'Échelle 1 : n : 1 cm sur le plan représente n cm en réalité. 1 m = 100 cm ; 1 km = 100\'000 cm.',
+      indice: 'À l\'échelle 1 :\u00a0n, 1 cm sur le plan représente n cm en réalité. 1 m = 100 cm ; 1 km = 100\'000 cm.',
       reponse: { type: 'nombre', valeur: valeur, unite: unite },
       suffixe: unite || null,
       pieges: pieges,
@@ -788,7 +901,7 @@
       vrai: false,
       justeFaux: 'la baisse de ' + p + ' % se calcule sur le nouveau prix ' + tm(apres) + ' : on obtient ' + tm(fin) + ', pas ' + tm(base) + '.',
       autresFaux: ['on ne peut pas faire deux pourcentages de suite.'],
-      autresVrai: ['+ ' + p + ' % puis – ' + p + ' %, cela s\'annule.', 'on ajoute puis on enlève ' + p + ' CHF.'],
+      autresVrai: ['+ ' + p + ' % puis – ' + p + ' %, cela s\'annule.', 'on ajoute ' + tm(base * p / 100) + ', puis on enlève ' + tm(base * p / 100) + '.'],
       messageFaux: 'Le deuxième pourcentage se calcule sur le nouveau prix, qui est plus grand : la baisse est donc plus grande que la hausse.'
     });
     return {
@@ -1042,6 +1155,35 @@
     };
   }
 
+  /** D3 — effet de a dans f(x) = ax² (sens et ouverture de la parabole). */
+  function genSensAParabole(alea, d) {
+    var a = val(alea.choix([-3, -2, -1, '-0.5', '0.5', 2, 3]));
+    var srcA = (a.signe() < 0 ? '-' : '') + (a.abs().egal(1) ? '' : O.snPositif(a.abs())) + 'x^2';
+    var g = repere([{ src: srcA, nom: 'f' }, { src: 'x^2', classe: 'c1', nom: 'g' }], { ymin: -9, ymax: 9, description: 'Deux paraboles' });
+    var haut = a.signe() > 0, ouverte = a.abs().valeur() < 1;
+    var juste = 'Elle est tournée vers ' + (haut ? 'le haut' : 'le bas') + ' et ' + (ouverte ? 'plus ouverte' : a.abs().egal(1) ? 'aussi ouverte' : 'plus fermée') + ' que celle de x².';
+    var choix = [
+      { h: juste, juste: true },
+      { h: 'Elle est tournée vers ' + (haut ? 'le bas' : 'le haut') + ' et ' + (ouverte ? 'plus ouverte' : a.abs().egal(1) ? 'aussi ouverte' : 'plus fermée') + ' que celle de x².', juste: false, message: 'Le signe de a donne le sens : a ' + (haut ? '> 0 : vers le haut.' : '< 0 : vers le bas.') },
+      { h: 'Elle est tournée vers ' + (haut ? 'le haut' : 'le bas') + ' et ' + (ouverte ? 'plus fermée' : 'plus ouverte') + ' que celle de x².', juste: false, message: 'Plus a est grand en valeur absolue, plus les valeurs de f(x) grandissent vite : la parabole est plus fermée. Ici |a| = ' + tn(a.abs()) + '.' },
+      { h: 'Ce n\'est plus une parabole, c\'est une droite.', juste: false, message: 'Avec x², le graphique reste une parabole, quel que soit a ≠ 0.' }
+    ].filter(function (c, i) { return !(a.abs().egal(1) && i === 2); });
+    return {
+      type: 'choix',
+      enonce: '<p>On compare le graphique de ' + hf(srcA) + ' à celui de ' + hm('g(x) = x²') + ' (en pointillé).</p>' + O.graphiqueHtml(g) + '<p>Que peut-on dire de la parabole de f ?</p>',
+      indice: 'Le signe de a dit si la parabole est tournée vers le haut ou vers le bas. Compare f(2) et g(2).',
+      reponse: { type: 'choix' }, choix: O.melanger(alea, choix),
+      etapes: [
+        { texte: 'Signe de a : a = ' + tn(a) + (haut ? ' > 0, la parabole est tournée vers le haut.' : ' < 0, la parabole est tournée vers le bas.') },
+        { texte: 'On compare des valeurs.', calcul: hm('f(2) = ' + tn(a.fois(4)) + ' ; g(2) = 4') },
+        { texte: ouverte ? '|a| < 1 : les valeurs grandissent moins vite, la parabole est plus ouverte.' : a.abs().egal(1) ? '|a| = 1 : même ouverture que x².' : '|a| > 1 : les valeurs grandissent plus vite, la parabole est plus fermée.' }
+      ],
+      verification: '',
+      rubrique: R.quadratique,
+      controle: { ops: 3, xs: [2], ys: [a.fois(4).toString()], coefs: [a.toString()], calc: { genre: 'choix' } }
+    };
+  }
+
   /** D3 — trouver a et b d'une situation à partir de deux données (décimaux). */
   function genTrouverAB(alea, d) {
     var s = alea.choix(SITUATIONS), a = val(alea.choix(s.aVals)), b = val(alea.choix(s.bVals));
@@ -1179,8 +1321,8 @@
       reponse: { type: 'liste', valeurs: trous.map(function (i) { return ys[i]; }), noms: ['A', 'B'] },
       pieges: [{ liste: trous.map(function (i) { return -ys[i]; }), message: s > 0 ? 'Un carré n\'est jamais négatif : (– 3)² = 9.' : '– (– 3)² = – 9 : on élève au carré AVANT de prendre l\'opposé.' }],
       etapes: [
-        { texte: 'Case A (x = ' + xs[trous[0]] + ').', calcul: hm('f(' + tn(xs[trous[0]]) + ') = ' + (s < 0 ? '– ' : '') + tnp(xs[trous[0]]) + '² = ' + tn(ys[trous[0]])) },
-        { texte: 'Case B (x = ' + xs[trous[1]] + ').', calcul: hm('f(' + tn(xs[trous[1]]) + ') = ' + (s < 0 ? '– ' : '') + tnp(xs[trous[1]]) + '² = ' + tn(ys[trous[1]])) }
+        { texte: 'Case A (x = ' + tn(xs[trous[0]]) + ').', calcul: hm('f(' + tn(xs[trous[0]]) + ') = ' + (s < 0 ? '– ' : '') + tnp(xs[trous[0]]) + '² = ' + tn(ys[trous[0]])) },
+        { texte: 'Case B (x = ' + tn(xs[trous[1]]) + ').', calcul: hm('f(' + tn(xs[trous[1]]) + ') = ' + (s < 0 ? '– ' : '') + tnp(xs[trous[1]]) + '² = ' + tn(ys[trous[1]])) }
       ],
       verification: 'Contrôle : le tableau est symétrique, ' + hm('f(– 2) = f(2)') + '.',
       rubrique: R.quadratique,
@@ -1203,13 +1345,42 @@
       indice: 'Calcule f(2) et f(– 2). Les points sont-ils au-dessus ou en dessous de l\'axe horizontal ?',
       reponse: { type: 'choix' }, choix: nommer(O.melanger(alea, choix), 'Graphique'), choixGraphiques: true,
       etapes: [
-        { texte: 'Quelques valeurs.', calcul: hm('f(0) = 0 ; f(1) = ' + s + ' ; f(2) = ' + (4 * s) + ' ; f(– 2) = ' + (4 * s)) },
+        { texte: 'Quelques valeurs.', calcul: hm('f(0) = 0 ; f(1) = ' + tn(s) + ' ; f(2) = ' + tn(4 * s) + ' ; f(– 2) = ' + tn(4 * s)) },
         { texte: 'Les points ne sont pas alignés : c\'est une parabole.' },
         { texte: s > 0 ? 'Toutes les valeurs sont positives ou nulles : la parabole est tournée vers le haut, sommet en (0 ; 0).' : 'Toutes les valeurs sont négatives ou nulles : la parabole est tournée vers le bas, sommet en (0 ; 0).' }
       ],
       verification: '',
       rubrique: R.quadratique,
       controle: { ops: 3, xs: [], ys: [], coefs: [s], calc: { genre: 'choix-param', attendu: nomCarre(s), contexte: { s: s } } }
+    };
+  }
+
+  /** D3 — vrai ou faux : un point appartient-il au graphique de x² ou de – x² ? */
+  function genPointParabole(alea, d) {
+    var s = alea.choix([1, -1]), x0 = alea.choix([-4, -3, -2, 2, 3, 4]);
+    var vrai = alea.suivant() < 0.5;
+    var y = vrai ? s * x0 * x0 : -s * x0 * x0;
+    var opts = O.optionsVraiFaux(alea, {
+      vrai: vrai,
+      justeVrai: hm('f(' + tn(x0) + ') = ' + (s < 0 ? '– ' : '') + tnp(x0) + '² = ' + tn(s * x0 * x0)) + '.',
+      justeFaux: hm('f(' + tn(x0) + ') = ' + (s < 0 ? '– ' : '') + tnp(x0) + '² = ' + tn(s * x0 * x0)) + ' et non ' + tn(y) + '.',
+      autresVrai: ['un carré est toujours positif, donc ' + tn(y) + ' convient.', tnp(x0) + ' · 2 = ' + tn(2 * x0) + '.'],
+      autresFaux: ['un point d\'une parabole a toujours une abscisse positive.', 'x² = 2x.'],
+      messageFaux: s > 0 ? '(– 3)² = (– 3) · (– 3) = 9 : moins fois moins donne plus.' : '– x² : on élève d\'abord au carré, puis on prend l\'opposé. – (– 3)² = – 9.'
+    });
+    return {
+      type: 'vraifaux',
+      enonce: '<p>« Le point ' + hm(tc(x0, y)) + ' appartient au graphique de ' + hf(nomCarre(s)) + '. » Vrai ou faux ?</p>',
+      indice: 'Calcule f(' + tn(x0) + ') et compare avec la deuxième coordonnée.',
+      reponse: { type: 'choix' }, choix: opts,
+      etapes: [
+        { texte: 'On calcule l\'image de la première coordonnée.', calcul: hm('f(' + tn(x0) + ') = ' + (s < 0 ? '– ' : '') + tnp(x0) + '² = ' + tn(s * x0 * x0)) },
+        { texte: 'On compare avec la deuxième coordonnée, ' + tn(y) + '.' },
+        { texte: vrai ? 'C\'est le même nombre : le point appartient au graphique.' : 'Les nombres sont différents : le point n\'appartient pas au graphique.' }
+      ],
+      verification: '',
+      rubrique: R.quadratique,
+      controle: { ops: 3, xs: [x0], ys: [y], coefs: [s], calc: { genre: 'choix' } }
     };
   }
 
@@ -1238,12 +1409,13 @@
    * Catalogue du module B
    * ===================================================================== */
   var objectifs = [
-    { id: 'B1', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', theme: 'FA 10.1', titre: 'Nommer une représentation : droite linéaire, affine, constante, parabole',
+    { id: 'B1', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', theme: 'FA 10.1', titre: 'Reconnaître une fonction affine (linéaire, constante) ou une parabole',
       modeles: [
         { type: 'choix', dMin: 1, dMax: 1, gen: genNomGraphique },
         { type: 'choix', dMin: 1, dMax: 1, gen: genNomExpression },
         { type: 'vraifaux', dMin: 2, dMax: 2, gen: genVraiFauxOrigine },
         { type: 'tableau', dMin: 3, dMax: 3, gen: genNomTableau, niveauDependant: true },
+        { type: 'relier', dMin: 3, dMax: 3, gen: genChoisirParabole },
         { type: 'erreur', dMin: 4, dMax: 4, gen: genErreurClassement }
       ] },
     { id: 'B2', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', theme: 'FA 10.1', titre: 'Passer de l\'expression au tableau et au graphique, et inversement',
@@ -1253,16 +1425,18 @@
         { type: 'tableau', dMin: 2, dMax: 2, gen: genExprVersTableau },
         { type: 'lecture', dMin: 2, dMax: 2, gen: genGraphiqueVersExpression },
         { type: 'relier', dMin: 3, dMax: 3, gen: genExprVersGraphique, niveauDependant: true },
-        { type: 'directe', dMin: 3, dMax: 3, gen: genPenteDeuxPoints, niveauDependant: true },
-        { type: 'directe', dMin: 4, dMax: 4, gen: genExpressionDeuxPoints, niveauDependant: true },
+        { type: 'lecture', dMin: 3, dMax: 3, gen: genGraphiqueVersTableau, niveauDependant: true },
+        { type: 'tableau', dMin: 4, dMax: 4, gen: genTableauVersExpression, niveauDependant: true },
         { type: 'lecture', dMin: 4, dMax: 4, gen: genGraphiqueVersExpression, niveauDependant: true }
       ] },
-    { id: 'B3', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', theme: 'FA 10.1', titre: 'Intersection de deux droites : graphiquement et par le calcul',
+    { id: 'B3', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', theme: 'FA 10.1', titre: 'Intersection de deux droites : graphiquement (et par le calcul au niveau 2)',
       modeles: [
         { type: 'lecture', dMin: 1, dMax: 1, gen: genLireIntersection },
         { type: 'vraifaux', dMin: 2, dMax: 2, gen: genVerifierIntersection },
-        { type: 'directe', dMin: 3, dMax: 3, gen: genIntersectionConstante, niveauDependant: true },
-        { type: 'directe', dMin: 4, dMax: 4, gen: genIntersectionAlgebrique, niveauDependant: true },
+        { type: 'lecture', dMin: 3, dMax: 3, gen: genIntersectionGraphique, niveaux: [1] },
+        { type: 'tableau', dMin: 4, dMax: 4, gen: genIntersectionTableau, niveaux: [1] },
+        { type: 'directe', dMin: 3, dMax: 3, gen: genIntersectionConstante, niveaux: [2] },
+        { type: 'directe', dMin: 4, dMax: 4, gen: genIntersectionAlgebrique, niveaux: [2] },
         { type: 'directe', dMin: 4, dMax: 4, gen: genIntersectionLireCalculer, niveaux: [2] }
       ] },
     { id: 'B4', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', theme: 'FA 10.1', titre: 'Proportionnalité : échelle, pourcentage, pente d\'une route, agrandissement',
@@ -1283,22 +1457,24 @@
         { type: 'probleme', dMin: 4, dMax: 4, gen: genCompleterCirculaire },
         { type: 'erreur', dMin: 4, dMax: 4, gen: genErreurDiagramme }
       ] },
-    { id: 'B6', module: 'B', annee: 10, niveaux: [2], statut: 'evalue', theme: 'FA 10.1', titre: 'Interpréter a et b dans une situation, comparer des offres',
+    { id: 'B6', module: 'B', annee: 10, niveaux: [2], statut: 'evalue', theme: 'FA 10.1', titre: 'Interpréter les coefficients : a et b de ax + b (situations, offres), a de ax²',
       modeles: [
         { type: 'choix', dMin: 1, dMax: 1, gen: genSensCoefficients },
         { type: 'choix', dMin: 2, dMax: 2, gen: genChangementCoefficient },
         { type: 'probleme', dMin: 3, dMax: 3, gen: genTrouverAB },
+        { type: 'choix', dMin: 3, dMax: 3, gen: genSensAParabole },
         { type: 'probleme', dMin: 4, dMax: 4, gen: genComparerOffres },
         { type: 'raconte', dMin: 4, dMax: 4, gen: genSensIntersection }
       ] },
-    { id: 'B7', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', plusLoinN1: [10, 11], theme: 'FA 10.1', titre: 'Fonctions x² et – x² : tableau de valeurs et graphique',
+    { id: 'B7', module: 'B', annee: 10, niveaux: [1, 2], statut: 'evalue', plusLoinN1: [10, 11], theme: 'FA 10.1', titre: 'Tracer x² et – x² avec un tableau de valeurs',
       modeles: [
         { type: 'directe', dMin: 1, dMax: 1, gen: genCarreImage },
         { type: 'tableau', dMin: 2, dMax: 2, gen: genTableauCarre },
-        { type: 'relier', dMin: 3, dMax: 3, gen: genChoisirParabole },
+        { type: 'vraifaux', dMin: 3, dMax: 3, gen: genPointParabole },
         { type: 'directe', dMin: 4, dMax: 4, gen: genSymetrieParabole }
       ] }
   ];
 
-  return { objectifs: objectifs, tirerPente: tirerPente };
+  // genPenteDeuxPoints et genExpressionDeuxPoints (pente et ordonnée à l'origine) : réservés au module C (11e).
+  return { objectifs: objectifs, tirerPente: tirerPente, genPenteDeuxPoints: genPenteDeuxPoints, genExpressionDeuxPoints: genExpressionDeuxPoints };
 });

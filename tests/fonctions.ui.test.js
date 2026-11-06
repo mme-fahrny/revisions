@@ -58,26 +58,46 @@ async function toucher(page, sel) {
 }
 
 /* ---------- réponses ---------- */
-async function repondre(page, juste, ctx) {
+/** Saisit une réponse juste ou fausse (en évitant les options déjà désactivées) et clique sur « Vérifier ». */
+async function saisir(page, juste) {
   var info = await page.evaluate(function (juste) {
     var q = window.FonctionsApp.questionCourante();
     var ex = q.exemples();
     var r = { mode: q.mode, objectif: q.objectif, modele: q.modele, juste: juste };
-    if (q.mode === 'choix') r.index = q.choix.findIndex(function (c) { return c.juste === juste; });
-    else r.texte = juste ? ex.justes[0] : ex.faux[0];
+    if (q.mode === 'choix') {
+      r.index = q.choix.findIndex(function (c, i) { var b = document.getElementById('choix-' + i); return c.juste === juste && b && !b.disabled; });
+      if (r.index < 0) { r.index = q.choix.findIndex(function (c) { return c.juste; }); r.juste = true; }
+    } else r.texte = juste ? ex.justes[0] : ex.faux[(document.getElementById('reponse').dataset.essais || 0) % ex.faux.length];
+    if (q.mode !== 'choix') document.getElementById('reponse').dataset.essais = String((Number(document.getElementById('reponse').dataset.essais) || 0) + 1);
     return r;
   }, juste);
   if (info.mode === 'choix') await toucher(page, 'label[for="choix-' + info.index + '"]');
   else await page.fill('#reponse', info.texte);
   await toucher(page, '#verifier');
+  return info;
+}
+
+/** mode : 'juste' (du premier coup), 'faux-juste' (2e essai réussi) ou 'faux-faux'. Renvoie true si réussie. */
+async function repondre(page, mode, ctx) {
+  var info = await saisir(page, mode === 'juste');
   var classe = await page.getAttribute('#retour', 'class');
   verifier(!/info/.test(classe), 'réponse jugée illisible (' + ctx + ' ' + info.modele + ') : ' + JSON.stringify(info) + ' → ' + await page.textContent('#retour'));
-  verifier(juste ? /juste/.test(classe) : /faux/.test(classe), 'verdict inattendu (' + ctx + ' ' + info.modele + ') : ' + JSON.stringify(info) + ' → ' + await page.textContent('#retour'));
+  var reussie = info.juste;
+  if (!info.juste) {
+    verifier(/faux/.test(classe), 'verdict inattendu au 1er essai (' + ctx + ' ' + info.modele + ') : ' + await page.textContent('#retour'));
+    verifier((await page.textContent('#retour')).length > 20, 'rétroaction trop courte (' + info.modele + ')');
+    verifier(await page.locator('#suivant').count() === 0 && await page.locator('.correction').count() === 0, 'correction montrée avant le 2e essai (' + info.modele + ')');
+    verifier(/deuxième essai/.test(await page.textContent('#retour')), 'deuxième essai non proposé (' + info.modele + ')');
+    var info2 = await saisir(page, mode === 'faux-juste');
+    reussie = info2.juste;
+    classe = await page.getAttribute('#retour', 'class');
+    verifier(reussie ? /juste/.test(classe) && /2e essai/.test(await page.textContent('#retour')) : /faux/.test(classe), 'verdict inattendu au 2e essai (' + ctx + ' ' + info.modele + ') : ' + await page.textContent('#retour'));
+    if (!reussie && info2.mode !== 'choix') verifier(/Réponse attendue/.test(await page.textContent('#retour')), 'réponse attendue absente après le 2e essai (' + info.modele + ')');
+  } else verifier(/juste/.test(classe), 'verdict inattendu (' + ctx + ' ' + info.modele + ') : ' + JSON.stringify(info) + ' → ' + await page.textContent('#retour'));
   verifier(await page.locator('.correction').count() === 1, 'correction absente (' + info.modele + ')');
   verifier(/ÉTAPE 1/.test(await page.textContent('.correction')), 'correction sans ÉTAPE 1 (' + info.modele + ')');
   verifier(/Voir l'aide-mémoire, rubrique/.test(await page.textContent('.correction')), 'renvoi à l\'aide-mémoire absent (' + info.modele + ')');
-  if (!juste) verifier((await page.textContent('#retour')).length > 20, 'rétroaction trop courte (' + info.modele + ')');
-  return info;
+  return reussie;
 }
 
 async function finirSerie(page, ctx, n) {
@@ -90,7 +110,7 @@ async function finirSerie(page, ctx, n) {
       verifier(await page.isVisible('#zone-indice'), 'indice non affiché (' + ctx + ')');
     }
     if (i === 2) await capture(page, ctx + '-q3');
-    if ((await repondre(page, i % 2 === 0, ctx)).juste) nbJustes++;
+    if (await repondre(page, ['juste', 'faux-juste', 'juste', 'faux-faux'][i % 4], ctx)) nbJustes++;
     await pasDeDefilement(page, ctx + ' correction ' + (i + 1));
     if (i === 3) await capture(page, ctx + '-correction');
     await toucher(page, '#suivant');
@@ -108,13 +128,18 @@ async function serieComplete(page, module, difficulte, ctx) {
   await toucher(page, '#commencer');
   var c = ctx + ' ' + module + ' D' + difficulte;
   var nbJustes = await finirSerie(page, c, 10);
-  verifier((await page.textContent('.score')).trim().indexOf(nbJustes + ' / 10') === 0, 'score inattendu (' + c + ') : ' + await page.textContent('.score'));
+  var compte = await page.evaluate(function () {
+    var r = FonctionsApp.etat.resultats.filter(function (x) { return x.q.compte !== false; });
+    return { n: r.length, j: r.filter(function (x) { return x.juste; }).length, tous: FonctionsApp.etat.resultats.filter(function (x) { return x.juste; }).length };
+  });
+  verifier(compte.tous === nbJustes, 'réussites enregistrées (' + c + ') : ' + compte.tous + ' au lieu de ' + nbJustes);
+  verifier((await page.textContent('.score')).trim().indexOf(compte.j + ' / ' + compte.n) === 0 || compte.n === 0, 'score inattendu (' + c + ') : ' + await page.textContent('.score'));
   await pasDeDefilement(page, c + ' bilan');
   await capture(page, c + '-bilan');
   await toucher(page, '#refaire');
   for (var k = 0; k < 10 - nbJustes; k++) {
     await page.waitForSelector('#verifier');
-    await repondre(page, true, c + ' refaire');
+    await repondre(page, 'juste', c + ' refaire');
     await toucher(page, '#suivant');
   }
   await page.waitForSelector('.table-bilan');

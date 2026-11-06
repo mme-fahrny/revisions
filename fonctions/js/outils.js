@@ -101,11 +101,23 @@
   /** Source d'un nombre pour Maths.analyser. */
   function sn(x) { return '(' + val(x).toString() + ')'; }
   /** Expression a·x + b (source lisible par Maths.analyser). */
+  /** Nombre positif écrit pour Maths.analyser : décimal (0.5) si l'écriture est finie, sinon (2/3). */
+  function snPositif(x) {
+    var f = val(x);
+    return f.estDecimale() ? f.ecritureDecimale().replace(/[^0-9.,]/g, '').replace(',', '.') : '(' + f.toString() + ')';
+  }
+  /**
+   * Expression a·x + b (source lisible par Maths.analyser), écrite comme dans l'aide-mémoire :
+   * 2x – 4, – 3x + 1, 0,5x, x – 2 (jamais « x(– 2) » ni « (– 3)x »).
+   */
   function srcAffine(a, b) {
     a = val(a); b = val(b);
     var s = '';
-    if (!a.estZero()) s = a.egal(1) ? 'x' : a.egal(-1) ? '-x' : sn(a) + '*x';
-    if (!b.estZero() || s === '') s += (s && b.signe() >= 0 ? '+' : '') + sn(b);
+    if (!a.estZero()) {
+      var abs = a.abs();
+      s = (a.signe() < 0 ? '-' : '') + (abs.egal(1) ? 'x' : snPositif(abs) + 'x');
+    }
+    if (!b.estZero() || s === '') s += (b.signe() < 0 ? '-' : s ? '+' : '') + snPositif(b.abs());
     return s;
   }
   function tx(src) { return Maths.versTexte(src); }
@@ -149,7 +161,9 @@
     var gx = def.gx || 1, gy = def.gy || 1, lx = def.lx || gx, ly = def.ly || gy;
     var L = 300, Hh = def.hauteur || 220;
     var ux = L / (xmax - xmin), uy = Hh / (ymax - ymin);
-    var mg = 42, mh = 20, md = 16, mb = def.titreX ? 40 : 26;
+    // axes toujours nommés (x et y par défaut), comme demandé en classe
+    def = Object.assign({}, def, { titreX: def.titreX || 'x', titreY: def.titreY || 'y' });
+    var mg = 42, mh = 20, md = 16, mb = 40;
     function X(x) { return +(mg + (x - xmin) * ux).toFixed(2); }
     function Y(y) { return +(mh + (ymax - y) * uy).toFixed(2); }
     var W = mg + L + md, H = mh + Hh + mb;
@@ -176,7 +190,9 @@
       s.push('<text x="' + (X(ay) - 5) + '" y="' + (Y(k) + 4) + '" text-anchor="end">' + echapper(nombreAxe(+k.toFixed(6))) + '</text>');
     }
     s.push('</g>');
-    if (def.titreX) s.push('<text class="titre-axe" x="' + (X(xmax) + 6) + '" y="' + (H - 6) + '" text-anchor="end">' + echapper(def.titreX) + '</text>');
+    // nom de l'axe horizontal : au bout de la flèche si l'axe est dans le repère, sinon sous les nombres
+    if (ax !== ymin) s.push('<text class="titre-axe" x="' + (X(xmax) + 6) + '" y="' + (Y(ax) - 9) + '" text-anchor="end">' + echapper(def.titreX) + '</text>');
+    else s.push('<text class="titre-axe" x="' + (X(xmax) + 6) + '" y="' + (H - 6) + '" text-anchor="end">' + echapper(def.titreX) + '</text>');
     if (def.titreY) s.push('<text class="titre-axe" x="' + (X(ay) + 8) + '" y="' + (mh - 6) + '" text-anchor="start">' + echapper(def.titreY) + '</text>');
     (def.courbes || []).forEach(function (c, i) {
       var pts = [];
@@ -556,7 +572,7 @@
     Maths: Maths, F: F, NBSP: NBSP, MOINS: MOINS,
     RUBRIQUES: RUBRIQUES, ERREURS: ERREURS, PRENOMS: PRENOMS, MENTION_FICTIVE: MENTION_FICTIVE,
     val: val, tn: tn, hn: hn, tnp: tnp, tm: tm, tc: tc, sn: sn, tx: tx, hm: hm, hf: hf,
-    srcAffine: srcAffine, pluriel: pluriel, echapper: echapper,
+    srcAffine: srcAffine, snPositif: snPositif, pluriel: pluriel, echapper: echapper,
     tableauHtml: tableauHtml, svgGraphique: svgGraphique, svgBarres: svgBarres, svgCirculaire: svgCirculaire, graphiqueHtml: graphiqueHtml, pasAdapte: pasAdapte,
     lireNombre: lireNombre, lireExpr: lireExpr, lireCouple: lireCouple,
     verifier: verifier, exemples: exemples, clavierPour: clavierPour, finaliser: finaliser,

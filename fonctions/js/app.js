@@ -171,7 +171,7 @@
 
   function afficherQuestion() {
     etat.ecran = 'question';
-    etat.repondu = false; etat.choix = null;
+    etat.repondu = false; etat.choix = null; etat.essai = 1;
     var q = etat.serie[etat.index];
     var r = vider();
     var total = etat.serie.length;
@@ -248,8 +248,26 @@
       retour.appendChild(el('p', {}, [el('strong', { texte: 'À corriger : ' }), el('span', { texte: res.message })]));
       return;
     }
+    // Premier essai faux : la rétroaction nomme l'erreur, l'élève corrige sa réponse (2e essai).
+    // La réponse attendue et la correction ne s'affichent qu'après le 2e essai.
+    if (!res.juste && etat.essai === 1) {
+      etat.essai = 2;
+      retour.className = 'retour faux';
+      retour.innerHTML = '';
+      retour.appendChild(el('p', {}, [el('strong', { texte: res.statut === 'forme' ? 'Forme non conforme. ' : 'Pas tout à fait. ' }), el('span', { texte: res.message })]));
+      retour.appendChild(el('p', { 'class': 'deuxieme-essai', texte: 'Corrige ta réponse : tu as droit à un deuxième essai.' }));
+      if (q.mode === 'choix') {
+        var lab = racine().querySelector('label[for="choix-' + etat.choix + '"]');
+        if (lab) { lab.classList.add('option-fausse'); lab.querySelector('input').disabled = true; lab.querySelector('input').checked = false; }
+        etat.choix = null;
+      } else {
+        var c2 = $('#reponse'); if (c2 && !tactile()) c2.focus({ preventScroll: true });
+      }
+      $('#verifier').textContent = 'Vérifier (2e essai)';
+      return;
+    }
     etat.repondu = true;
-    etat.resultats.push({ q: q, juste: res.juste, statut: res.statut });
+    etat.resultats.push({ q: q, juste: res.juste, statut: res.statut, essais: etat.essai });
     enregistrerResultat(q.compte === false ? q.objectif + ' (plus loin)' : q.objectif, res.juste);
     if (etat.clavier) etat.clavier.element.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
     var champ = $('#reponse'); if (champ) champ.readOnly = true;
@@ -264,7 +282,7 @@
     $('#bouton-indice').hidden = true;
     retour.className = 'retour ' + (res.juste ? 'juste' : 'faux');
     retour.innerHTML = '';
-    if (res.juste) retour.appendChild(el('p', {}, [el('strong', { texte: 'Juste !' }), res.message ? el('span', { texte: ' ' + res.message }) : null]));
+    if (res.juste) retour.appendChild(el('p', {}, [el('strong', { texte: etat.essai === 2 ? 'Juste au 2e essai !' : 'Juste !' }), res.message ? el('span', { texte: ' ' + res.message }) : null]));
     else {
       retour.appendChild(el('p', {}, [el('strong', { texte: res.statut === 'forme' ? 'Forme non conforme. ' : 'Pas tout à fait. ' }), el('span', { texte: res.message })]));
       if (q.attenduHtml && q.mode !== 'choix') retour.appendChild(el('p', {}, [el('span', { texte: 'Réponse attendue : ' }), el('span', { 'class': 'maths', html: q.attenduHtml })]));
@@ -303,7 +321,8 @@
     var comptes = etat.resultats.filter(function (x) { return x.q.compte !== false; });
     var reussis = comptes.filter(function (x) { return x.juste; }).length;
     r.appendChild(el('h2', { texte: 'Bilan de la série' }));
-    if (comptes.length) r.appendChild(el('p', { 'class': 'score' }, [el('strong', { texte: reussis + ' / ' + comptes.length }), ' réponse' + (reussis > 1 ? 's' : '') + ' juste' + (reussis > 1 ? 's' : '') + (comptes.length < etat.resultats.length ? ' (sans les questions non comptées)' : '') + '.']));
+    if (comptes.length) r.appendChild(el('p', { 'class': 'score' }, [el('strong', { texte: reussis + ' / ' + comptes.length }), ' réponse' + (reussis > 1 ? 's' : '') + ' juste' + (reussis > 1 ? 's' : '') + (comptes.length < etat.resultats.length ? ' (sans les questions non comptées)' : '') + '.',
+      (function () { var n2 = comptes.filter(function (x) { return x.juste && x.essais === 2; }).length; return n2 ? ' Dont ' + n2 + ' au 2e essai.' : ''; })()]));
     else {
       var libres = etat.resultats.filter(function (x) { return x.juste; }).length;
       r.appendChild(el('p', { 'class': 'score' }, ['Entraînement facultatif : ', el('strong', { texte: libres + ' / ' + etat.resultats.length }), ' (non compté dans le bilan).']));

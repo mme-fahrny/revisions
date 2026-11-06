@@ -35,7 +35,7 @@ function verifierQue(cond, cle, detail) {
 function nb(x) { return typeof x === 'number' ? x : Maths.Fraction.depuis(String(x)).valeur(); }
 function proches(a, b) { return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b)); }
 function texteBrut(h) {
-  return String(h || '').replace(/<svg[\s\S]*?<\/svg>/g, ' ').replace(/<[^>]*>/g, ' ')
+  return String(h || '').replace(/<svg[\s\S]*?<\/svg>/g, ' ').replace(/<[^>]*>/g, ' ').replace(/\u00a0/g, ' ')
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
 }
 function textesQuestion(q) {
@@ -98,12 +98,35 @@ function attenduIndependant(q) {
     }
     case 'choix-param': {
       var jp = q.choix.filter(function (ch) { return ch.juste; })[0];
-      return jp.param[0] === c.contexte.p && jp.param[1] === c.contexte.fixe;
+      if (c.contexte.fixe !== undefined) return jp.param[0] === c.contexte.p && jp.param[1] === c.contexte.fixe;
+      if (c.contexte.s !== undefined) return jp.param === (c.contexte.s > 0 ? 'x^2' : '-x^2');
+      return nb(jp.param[0]) === nb(c.contexte.a) && nb(jp.param[1]) === nb(c.contexte.b);
     }
     case 'choix-points': {
       var jt = q.choix.filter(function (ch) { return ch.juste; })[0];
       // le graphique juste contient bien les points (x ; ax + b)
       return jt.param === 'vrais';
+    }
+    case 'carre': return egal(c.s * c.x * c.x);
+    case 'liste-carre': return r.valeurs.length === c.xs.length && c.xs.every(function (x, i) { return proches(nb(r.valeurs[i]), c.s * x * x); });
+    case 'couple-carre': return proches(nb(r.x), c.x) && proches(nb(r.y), c.s * c.x * c.x);
+    case 'pente': return egal((nb(c.y2) - nb(c.y1)) / (c.x2 - c.x1));
+    case 'formule': return egal(Number(Function('return (' + c.formule + ');')()));
+    case 'intersection': {
+      var a1 = nb(c.l1[0]), b1 = nb(c.l1[1]), a2 = nb(c.l2[0]), b2 = nb(c.l2[1]);
+      var xi = (b2 - b1) / (a1 - a2);
+      return proches(nb(r.x), xi) && proches(nb(r.y), a1 * xi + b1);
+    }
+    case 'offres': {
+      // premier entier n à partir duquel A est strictement moins chère (et le reste)
+      var A = function (n) { return nb(c.A[0]) * n + nb(c.A[1]); }, B = function (n) { return nb(c.B[0]) * n + nb(c.B[1]); };
+      for (var n = 0; n < 10000; n++) if (A(n) < B(n) - 1e-9 && A(n + 50) < B(n + 50)) return egal(n);
+      return false;
+    }
+    case 'choix-nom': {
+      var f = c.fonction;
+      var type = f.carre ? 'parabole' : nb(f.a) === 0 ? 'constante' : nb(f.b) === 0 ? 'lineaire' : 'affine';
+      return q.choix.filter(function (ch) { return ch.juste; })[0].param === type;
     }
     case 'choix': return true;
   }
@@ -135,12 +158,35 @@ function verifierBornes(q, annee, cle) {
     verifierQue(!/pente/i.test(t), cle + ' 9e : le mot « pente »', t.slice(0, 120));
     verifierQue(!/\dx\s*–|\bx\s–\s\d/.test(sansTableaux), cle + ' 9e : expression « … x – … »', sansTableaux.slice(0, 160));
   }
+  if (annee === 10) {
+    if (d === 1) {
+      verifierQue(xs.every(function (x) { return entier(x) && x >= 0 && x <= 10; }), cle + ' D1 : x entier de 0 à 10', xs);
+      verifierQue(ys.every(function (y) { return Math.abs(y) <= 50; }), cle + ' D1 : y au plus 50', ys);
+      verifierQue(!c.grad || c.grad.every(function (g) { return g === 1 || g === 2; }), cle + ' D1 : graduations de 1 ou 2', c.grad);
+      verifierQue(c.ops <= 1, cle + ' D1 : une seule étape', c.ops);
+    } else if (d === 2) {
+      verifierQue(xs.every(function (x) { return entier(x) && x >= -5 && x <= 10; }), cle + ' D2 : x entier de – 5 à 10', xs);
+      verifierQue((c.coefs || []).every(entier), cle + ' D2 : coefficients entiers', c.coefs);
+      verifierQue(c.ops <= 2, cle + ' D2 : deux étapes au plus', c.ops);
+    } else if (d === 3) {
+      verifierQue(c.ops <= 3, cle + ' D3 : trois étapes au plus', c.ops);
+    }
+    if (q.niveauEleve === 1) {
+      // N1 : pas de pente décimale autre que 0,5, pas de calcul algébrique d'intersection, pas d'interprétation
+      verifierQue((c.coefs || []).every(function (k) { return entier(k) || nb(k) === 0.5; }), cle + ' 10e N1 : nombre décimal autre que 0,5', c.coefs);
+      verifierQue(['genIntersectionConstante', 'genIntersectionAlgebrique', 'genIntersectionLireCalculer', 'genPenteDeuxPoints', 'genExpressionDeuxPoints'].indexOf(q.modele) < 0, cle + ' 10e N1 : contenu exclu', q.modele);
+      verifierQue(q.objectif !== 'B6', cle + ' 10e N1 : interprétation de a et b', q.objectif);
+    }
+    verifierQue(['genPenteDeuxPoints', 'genExpressionDeuxPoints'].indexOf(q.modele) < 0, cle + ' 10e : pente calculée (11e seulement)', q.modele);
+  }
 }
 
 /* ---------- conventions d'écriture ---------- */
 function verifierConventions(q, cle) {
   var t = textesQuestion(q).replace(/CHF\s*\d[\d']*\.\d\d/g, '').replace(/\d[\d']*\.\d\d\s*francs?/g, '');
   verifierQue(!/[×÷*]/.test(t), cle + ' : ×, ÷ ou * affiché', t.slice(0, 160));
+  // jamais de produit implicite avec un nombre négatif entre parenthèses (« x(– 2) », « (– 3)x ») : bug d'écriture
+  verifierQue(!/[0-9x²]\(\s*–\s*[\d,]+\s*\)|\(\s*–\s*[\d,]+\s*\)x/.test(t), cle + ' : écriture « x(– 2) » ou « (– 3)x »', (/.{0,30}(\(\s*–\s*[\d,]+\s*\)).{0,20}/.exec(t) || [''])[0]);
   verifierQue(!/\d\.\d/.test(t), cle + ' : point décimal hors montant', (/.{0,30}\d\.\d.{0,30}/.exec(t) || [''])[0]);
   verifierQue(!/(^|[\s(=])-\s?\d/.test(t), cle + ' : tiret au lieu du signe moins', (/.{0,30}(^|[\s(=])-\s?\d.{0,30}/.exec(t) || [''])[0]);
   verifierQue(/Voir|./.test(q.rubrique || ''), cle + ' : rubrique de l\'aide-mémoire manquante', q.modele);
@@ -192,6 +238,7 @@ Fn.MODULES.forEach(function (m) {
           var serie = Fn.creerSerie({ module: m.id, profil: profil, difficulte: diff, objectifs: ids, graine: cle + '#' + (s++), strict: true });
           serie.forEach(function (q) {
             n++;
+            q.niveauEleve = niveau;
             var o = Fn.parId[q.objectif];
             verifierQue(ids.indexOf(q.objectif) >= 0, cle + ' : objectif hors sélection', q.objectif);
             verifierQue(o.niveaux.indexOf(niveau) >= 0 && o.annee <= annee, cle + ' : objectif interdit pour ce profil', q.objectif);
@@ -221,6 +268,13 @@ Object.keys(positions).forEach(function (modele) {
   places.forEach(function (k) { total += p[k]; });
   verifierQue(places.length >= 3, 'choix : bonne réponse toujours aux mêmes places', modele + ' ' + JSON.stringify(p));
   places.forEach(function (k) { verifierQue(p[k] <= 0.6 * total, 'choix : bonne réponse trop souvent à la place ' + (Number(k) + 1), modele + ' ' + JSON.stringify(p)); });
+});
+
+/* ---------- écriture des expressions ax + b ---------- */
+[[1, -2, 'x – 2'], [2, -4, '2x – 4'], [-3, -4, '– 3x – 4'], ['0.5', -1, '0,5x – 1'], ['-0.5', 3, '– 0,5x + 3'], [-1, 0, '– x'], [0, -5, '– 5'], [4, 0, '4x'], [1, 3, 'x + 3']].forEach(function (c) {
+  var src = O.srcAffine(c[0], c[1]);
+  verifierQue(O.tx(src).replace(/\u00a0/g, ' ') === c[2], 'écriture de ax + b', src + ' → ' + O.tx(src) + ' (attendu ' + c[2] + ')');
+  verifierQue([-2, 0, 1, 3].every(function (x) { return proches(Maths.evaluerApproche(src, { x: x }), nb(c[0]) * x + nb(c[1])); }), 'valeur de ax + b', src);
 });
 
 /* ---------- saisies particulières ---------- */
