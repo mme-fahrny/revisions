@@ -271,7 +271,7 @@
     do { a = alea.entier(2, 9); x0 = alea.entier(2, 10); } while (a * x0 > 50);
     return {
       type: 'directe',
-      enonce: '<p>Pour la fonction linéaire ' + hf(a + 'x') + ', calcule ' + hm('f(' + x0 + ')') + '.</p>',
+      enonce: '<p>Pour la fonction affine linéaire ' + hf(a + 'x') + ', calcule ' + hm('f(' + x0 + ')') + '.</p>',
       indice: hm(a + 'x') + ' veut dire ' + a + ' · x.',
       reponse: { type: 'nombre', valeur: a * x0 },
       pieges: [{ valeur: a + x0, message: a + 'x signifie ' + a + ' · x : il faut multiplier.' }],
@@ -628,10 +628,10 @@
     var l = { a: a, b: b };
     return {
       type: 'directe',
-      enonce: '<p>On donne ' + hl(l, 'f') + ' et la fonction constante ' + hm('g(x) = ' + tn(c)) + '.</p><p>Calcule les coordonnées du point d\'intersection de leurs graphiques.</p>',
+      enonce: '<p>On donne ' + hl(l, 'f') + ' et la fonction affine constante ' + hm('g(x) = ' + tn(c)) + '.</p><p>Calcule les coordonnées du point d\'intersection de leurs graphiques.</p>',
       consigne: 'Écris (x ; y).',
       indice: 'Au point d\'intersection, f(x) = g(x), donc ' + hm(O.tx(src(l)) + ' = ' + tn(c)) + '.',
-      reponse: { type: 'couple', x: x0, y: c, messageY: 'L\'ordonnée est la valeur de la fonction constante : y = ' + tn(c) + '.' },
+      reponse: { type: 'couple', x: x0, y: c, messageY: 'L\'ordonnée est la valeur de la fonction affine constante : y = ' + tn(c) + '.' },
       etapes: [
         { texte: 'On écrit f(x) = g(x).', calcul: hm(O.tx(src(l)) + ' = ' + tn(c)) },
         { texte: 'On résout.', calcul: hm(tn(a) + 'x = ' + tn(c) + ' – ' + tnp(b) + ' = ' + tn(c.moins(b)) + ' ; x = ' + tn(c.moins(b)) + ' : ' + tnp(a) + ' = ' + tn(x0)) },
@@ -1136,8 +1136,8 @@
     var textes = {
       'b+': { q: 'La prise en charge augmente de 5 CHF, le prix par heure ne change pas.', juste: 'La droite monte de 5 carreaux de 1 CHF, elle reste parallèle (même pente).', calcul: 'f(x) = ' + a + 'x + ' + b + ' devient g(x) = ' + a + 'x + ' + (b + 5) },
       'a+': { q: 'Le prix par heure passe de ' + a + ' CHF à ' + (a + 2) + ' CHF, la prise en charge ne change pas.', juste: 'La droite part du même point (0 ; ' + b + '), mais elle est plus raide.', calcul: 'f(x) = ' + a + 'x + ' + b + ' devient g(x) = ' + (a + 2) + 'x + ' + b },
-      'a0': { q: 'On remplace la location à l\'heure par un forfait de ' + b + ' CHF, quelle que soit la durée.', juste: 'La droite devient horizontale : fonction constante (a = 0).', calcul: 'f(x) = ' + a + 'x + ' + b + ' devient g(x) = ' + b },
-      'b0': { q: 'La prise en charge est supprimée, le prix par heure ne change pas.', juste: 'La droite passe par l\'origine : fonction linéaire (b = 0), même pente.', calcul: 'f(x) = ' + a + 'x + ' + b + ' devient g(x) = ' + a + 'x' }
+      'a0': { q: 'On remplace la location à l\'heure par un forfait de ' + b + ' CHF, quelle que soit la durée.', juste: 'La droite devient horizontale : fonction affine constante (a = 0).', calcul: 'f(x) = ' + a + 'x + ' + b + ' devient g(x) = ' + b },
+      'b0': { q: 'La prise en charge est supprimée, le prix par heure ne change pas.', juste: 'La droite passe par l\'origine : fonction affine linéaire (b = 0), même pente.', calcul: 'f(x) = ' + a + 'x + ' + b + ' devient g(x) = ' + a + 'x' }
     };
     var t = textes[cas];
     var choix = ['b+', 'a+', 'a0', 'b0'].map(function (k) {

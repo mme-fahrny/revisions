@@ -37,10 +37,9 @@
    * Rubriques de l'aide-mémoire. À VÉRIFIER par l'enseignante : intitulés
    * exacts de l'édition 2024. Tout est regroupé ici pour les corriger d'un coup.
    * ===================================================================== */
-  /* Noms des rubriques de l'aide-mémoire (MER), vérifiés sur l'aide-mémoire de l'enseignante :
-   * seuls les noms sont repris, jamais le contenu. « Équations » : nom de la partie, rubrique
-   * précise à confirmer (pages non lisibles dans la copie disponible). Pas de rubrique pour la
-   * fonction exponentielle dans l'aide-mémoire. */
+  /* Noms des rubriques de l'aide-mémoire (MER, édition utilisée en 9e et 10e) : seuls les noms
+   * sont repris, jamais le contenu. Pas de rubrique « fonction exponentielle » : renvoi à
+   * « Représentation graphique » (décision de l'enseignante). */
   var RUBRIQUES = {
     fonction: 'Fonctions – Généralités',
     tableau: 'Définir une fonction',
@@ -59,15 +58,16 @@
     expressionGraphique: 'Déterminer l\'expression fonctionnelle d\'une fonction affine à partir de sa représentation graphique',
     construireAffine: 'Construire la représentation graphique d\'une fonction affine',
     penteTerrain: 'Pente',
-    equations: 'Équations',
+    equations: 'Résoudre une équation du premier degré à une inconnue',
     pourcentage: 'Pourcentage',
     echelle: 'Échelle',
-    agrandissement: 'Échelle',
+    agrandissement: 'Figures semblables',
     diagrammes: 'Diagrammes',
     quadratique: 'Fonction quadratique',
     cubique: 'Fonction cubique',
     racineCarree: 'Fonction racine carrée',
-    homographique: 'Fonction homographique'
+    homographique: 'Fonction homographique',
+    exponentielle: 'Représentation graphique'
   };
 
   /* =====================================================================
