@@ -66,12 +66,12 @@
    * ===================================================================== */
   // Noms les plus précis (vocabulaire de la classe) : affine linéaire, affine constante, affine.
   var NOMS = { lineaire: 'affine linéaire', affine: 'affine', constante: 'affine constante', parabole: 'parabole' };
-  var NOMS_CHOIX = { lineaire: 'fonction affine linéaire', affine: 'fonction affine', constante: 'fonction affine constante', parabole: 'fonction dont le graphique est une parabole' };
+  var NOMS_CHOIX = { lineaire: 'fonction affine linéaire', affine: 'fonction affine', constante: 'fonction affine constante', parabole: 'fonction quadratique (son graphique est une parabole)' };
   var EXPLICATION = {
     lineaire: 'Le graphique est une droite qui passe par l\'origine (0 ; 0) : c\'est une fonction affine linéaire, f(x) = ax.',
     affine: 'Le graphique est une droite qui ne passe pas par l\'origine et n\'est pas horizontale : c\'est une fonction affine, f(x) = ax + b avec b ≠ 0. ' + E.affineOrigine,
     constante: 'Le graphique est une droite horizontale : f(x) a toujours la même valeur. C\'est une fonction affine constante, f(x) = b.',
-    parabole: 'Le graphique n\'est pas une droite : c\'est une parabole (par exemple f(x) = x² ou f(x) = – x²).'
+    parabole: 'Le graphique n\'est pas une droite : c\'est une parabole, le graphique d\'une fonction quadratique (par exemple f(x) = x² ou f(x) = – x²).'
   };
   function choixNoms(juste) {
     return ['lineaire', 'affine', 'constante', 'parabole'].map(function (t) {
