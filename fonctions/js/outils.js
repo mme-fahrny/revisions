@@ -163,7 +163,7 @@
   /* =====================================================================
    * Graphique en SVG (texte). Utilisé dans les énoncés, les choix et l'aperçu.
    * def : { xmin, xmax, ymin, ymax, gx, gy (pas du quadrillage), lx, ly (pas des
-   *         nombres écrits), titreX, titreY, courbes: [{ src, classe }],
+   *         nombres écrits), titreX, titreY, courbes: [{ src | f (fonction JS), classe, nom }],
    *         segments: [[[x, y], [x, y], …]] (lignes brisées), points: [{ x, y, nom }],
    *         description (texte pour les lecteurs d'écran) }
    * ===================================================================== */
@@ -209,19 +209,31 @@
     else s.push('<text class="titre-axe" x="' + (X(xmax) + 6) + '" y="' + (H - 6) + '" text-anchor="end">' + echapper(def.titreX) + '</text>');
     if (def.titreY) s.push('<text class="titre-axe" x="' + (X(ay) + 8) + '" y="' + (mh - 6) + '" text-anchor="start">' + echapper(def.titreY) + '</text>');
     (def.courbes || []).forEach(function (c, i) {
-      var pts = [];
-      var n = c.src.indexOf('^') >= 0 ? 240 : 2;
+      // c.src : expression lue par Maths ; c.f : fonction JS (exponentielle, racine carrée, hyperbole…)
+      var ev = c.f || function (x) { return Maths.evaluerApproche(c.src, { x: x }); };
+      var courbe = !!c.f || c.src.indexOf('^') >= 0 || c.src.indexOf('/x') >= 0;
+      var n = courbe ? 300 : 2, morceaux = [], pts = [], haut = ymax - ymin;
       for (var j = 0; j <= n; j++) {
-        var x = xmin + (xmax - xmin) * j / n;
-        var y = Maths.evaluerApproche(c.src, { x: x });
-        y = Math.max(ymin - (ymax - ymin), Math.min(ymax + (ymax - ymin), y));
+        var x = xmin + (xmax - xmin) * j / n, y;
+        try { y = ev(x); } catch (e) { y = NaN; }
+        if (typeof y !== 'number' || !isFinite(y) || y > ymax + haut || y < ymin - haut) {
+          // hors du domaine ou très loin du cadre : on coupe le tracé (branches d'une hyperbole)
+          if (isFinite(y) && pts.length) pts.push(X(x) + ',' + Y(Math.max(ymin - haut, Math.min(ymax + haut, y))));
+          if (pts.length > 1) morceaux.push(pts);
+          pts = [];
+          continue;
+        }
         pts.push(X(x) + ',' + Y(y));
       }
-      s.push('<polyline class="courbe ' + (c.classe || 'c' + i) + '" clip-path="url(#' + clip + ')" points="' + pts.join(' ') + '"/>');
+      if (pts.length > 1) morceaux.push(pts);
+      morceaux.forEach(function (m) {
+        s.push('<polyline class="courbe ' + (c.classe || 'c' + i) + '" clip-path="url(#' + clip + ')" points="' + m.join(' ') + '"/>');
+      });
       if (c.nom) {
         // nom de la courbe près du bord droit, à l'intérieur du repère
         for (var q = 0; q <= 40; q++) {
-          var xn = xmax - (xmax - xmin) * (0.04 + q * 0.02), yn = Maths.evaluerApproche(c.src, { x: xn });
+          var xn = xmax - (xmax - xmin) * (0.04 + q * 0.02), yn;
+          try { yn = ev(xn); } catch (e2) { yn = NaN; }
           if (yn < ymax - (ymax - ymin) * 0.06 && yn > ymin + (ymax - ymin) * 0.06) {
             s.push('<text class="nom-courbe ' + (c.classe || 'c' + i) + '" x="' + (X(xn) - 4) + '" y="' + (Y(yn) - 8) + '" text-anchor="end">' + echapper(c.nom) + '</text>');
             break;
@@ -263,6 +275,31 @@
     if (def.titreY) s.push('<text class="titre-axe" x="' + (mg + 6) + '" y="' + (mh - 8) + '">' + echapper(def.titreY) + '</text>');
     s.push('</svg>');
     return '<div class="cadre-graphique">' + s.join('') + '</div>';
+  }
+
+  /**
+   * Diagramme en barre (SVG) : une seule bande partagée, dont les longueurs des parties sont
+   * proportionnelles aux grandeurs. def : { categories: [texte], parts: [pourcentages],
+   * etiquettes: [texte de la légende], description }. Graduation en % sous la bande.
+   */
+  function svgBarre(def) {
+    var mg = 14, L = 320, y0 = 16, h = 46, W = mg * 2 + L, H = 96, x = mg;
+    var s = ['<svg class="svg-fonction svg-barre" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + echapper(def.description || 'Diagramme en barre') + '">'];
+    def.parts.forEach(function (p, i) {
+      var w = L * p / 100;
+      s.push('<rect class="secteur s' + (i % 6) + '" x="' + x.toFixed(2) + '" y="' + y0 + '" width="' + w.toFixed(2) + '" height="' + h + '"/>');
+      s.push('<text class="lettre-secteur" x="' + (x + w / 2).toFixed(2) + '" y="' + (y0 + h / 2 + 5) + '" text-anchor="middle">' + lettre(i) + '</text>');
+      x += w;
+    });
+    s.push('<g class="axes"><line x1="' + mg + '" y1="' + (y0 + h + 8) + '" x2="' + (mg + L) + '" y2="' + (y0 + h + 8) + '"/></g><g class="grille">');
+    for (var k = 0; k <= 20; k++) s.push('<line x1="' + (mg + L * k / 20) + '" y1="' + (y0 + h + 8) + '" x2="' + (mg + L * k / 20) + '" y2="' + (y0 + h + (k % 2 ? 12 : 15)) + '"/>');
+    s.push('</g><g class="nombres-axes">');
+    for (k = 0; k <= 10; k += 2) s.push('<text x="' + (mg + L * k / 10) + '" y="' + (y0 + h + 28) + '" text-anchor="middle">' + (k * 10) + ' %</text>');
+    s.push('</g></svg>');
+    var leg = '<ul class="legende-secteurs">' + def.categories.map(function (c, i) {
+      return '<li><span class="pastille-secteur s' + (i % 6) + '" aria-hidden="true">' + lettre(i) + '</span> ' + echapper(c) + (def.etiquettes && def.etiquettes[i] ? ' : ' + def.etiquettes[i] : '') + '</li>';
+    }).join('') + '</ul>';
+    return '<div class="cadre-circulaire cadre-barre">' + s.join('') + leg + '</div>';
   }
 
   /**
@@ -587,7 +624,7 @@
     RUBRIQUES: RUBRIQUES, ERREURS: ERREURS, PRENOMS: PRENOMS, MENTION_FICTIVE: MENTION_FICTIVE,
     val: val, tn: tn, hn: hn, tnp: tnp, tm: tm, tc: tc, sn: sn, tx: tx, hm: hm, hf: hf,
     srcAffine: srcAffine, snPositif: snPositif, pluriel: pluriel, echapper: echapper,
-    tableauHtml: tableauHtml, svgGraphique: svgGraphique, svgBarres: svgBarres, svgCirculaire: svgCirculaire, graphiqueHtml: graphiqueHtml, pasAdapte: pasAdapte,
+    tableauHtml: tableauHtml, svgGraphique: svgGraphique, svgBarres: svgBarres, svgBarre: svgBarre, svgCirculaire: svgCirculaire, graphiqueHtml: graphiqueHtml, pasAdapte: pasAdapte,
     lireNombre: lireNombre, lireExpr: lireExpr, lireCouple: lireCouple,
     verifier: verifier, exemples: exemples, clavierPour: clavierPour, finaliser: finaliser,
     melanger: melanger, optionsVraiFaux: optionsVraiFaux,

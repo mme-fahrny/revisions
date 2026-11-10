@@ -228,3 +228,7 @@ mark.signe-cible {
 .s0 { fill: var(--secteur-0); background: var(--secteur-0); } .s1 { fill: var(--secteur-1); background: var(--secteur-1); }
 .s2 { fill: var(--secteur-2); background: var(--secteur-2); } .s3 { fill: var(--secteur-3); background: var(--secteur-3); }
 .s4 { fill: var(--secteur-4); background: var(--secteur-4); } .s5 { fill: var(--secteur-5); background: var(--secteur-5); }
+
+/* Diagramme en barre (une bande partagée) */
+.cadre-barre svg { width: min(24rem, 100%); }
+.svg-barre .lettre-secteur { fill: #fff; font-weight: 700; font-size: 15px; }

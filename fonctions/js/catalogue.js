@@ -21,16 +21,22 @@
  *   - x et y peuvent être négatifs dès la 9e ; seuls les coefficients négatifs sont exclus en 9e ;
  *   - 10e : lire les coordonnées sur tout graphique (parabole comprise) ; tracer x² et – x²
  *     avec un tableau de valeurs : prolongement en N1, évalué en N2 ;
- *   - 11e : croissance et décroissance en prolongement ; exponentielle (base 2) en N2 :
- *     reconnaître son graphique, et lire un graphique dans des problèmes (lecture
- *     d'abscisse et d'ordonnée), sans calcul de type « double chaque année ».
+ *   - 11e : les objectifs l'emportent sur les décisions antérieures. Exponentielle (base 2),
+ *     cubique et homographique : communs aux deux niveaux (nomenclature non verte) ; racine
+ *     carrée : niveau 2. Exponentielle : reconnaître son graphique et y lire des valeurs
+ *     (abscisse, ordonnée), sans calcul de type « double chaque année » ;
+ *   - 11e : croissance et décroissance : niveau 2, comptées, questions de compréhension
+ *     (sans dérivée) ; intersections avec les axes Ox et Oy : les deux niveaux ;
+ *   - 11e : intersection de deux droites et résolution graphique d'équations (FA 11.2)
+ *     reprises dans le module C ;
+ *   - f(x) = … et f : x ⟼ … sont utilisées toutes les deux.
  */
 (function (racine, fabrique) {
   'use strict';
   if (typeof module === 'object' && module.exports) {
-    module.exports = fabrique(require('./outils.js'), [require('./module-a.js'), require('./module-b.js')]);
+    module.exports = fabrique(require('./outils.js'), [require('./module-a.js'), require('./module-b.js'), require('./module-c.js'), require('./module-c-grandeurs.js')]);
   } else {
-    racine.Fonctions = fabrique(racine.FonctionsOutils, [racine.FonctionsModuleA, racine.FonctionsModuleB]);
+    racine.Fonctions = fabrique(racine.FonctionsOutils, [racine.FonctionsModuleA, racine.FonctionsModuleB, racine.FonctionsModuleC, racine.FonctionsModuleC2]);
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (O, fichiers) {
   'use strict';
@@ -38,7 +44,7 @@
   var MODULES = [
     { id: 'A', titre: 'Situations, tableaux et graphiques', description: 'Vocabulaire, tableaux de valeurs, graphiques, proportionnalité, CHF et EUR.', debut: 9 },
     { id: 'B', titre: 'Fonctions affines, linéaires et constantes', description: 'Expression, tableau et graphique, intersection de deux droites, diagrammes.', debut: 10 },
-    { id: 'C', titre: 'Autres fonctions et graphiques', description: 'Coefficients a et b, intersections avec les axes, paraboles.', debut: 11 }
+    { id: 'C', titre: 'Autres fonctions et graphiques', description: 'Pente, expression à partir du graphique, axes, paraboles, exponentielle, grandeurs, diagrammes.', debut: 11 }
   ];
 
   var objectifs = [];

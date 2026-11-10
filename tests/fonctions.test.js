@@ -67,6 +67,7 @@ function signaturesControle(q) {
 }
 
 /* ---------- recalcul indépendant de la réponse attendue ---------- */
+function calculer(formule) { return Function('return (' + formule + ');')(); }
 function attenduIndependant(q) {
   var c = q.controle.calc, r = q.reponse;
   function egal(v) { return proches(nb(r.valeur), v); }
@@ -128,6 +129,33 @@ function attenduIndependant(q) {
       var type = f.carre ? 'parabole' : nb(f.a) === 0 ? 'constante' : nb(f.b) === 0 ? 'lineaire' : 'affine';
       return q.choix.filter(function (ch) { return ch.juste; })[0].param === type;
     }
+    /* ----- module C (11e) ----- */
+    case 'couple-f': return proches(nb(r.x), calculer(c.x)) && proches(nb(r.y), calculer(c.y));
+    case 'liste-f': return r.valeurs.length === c.formules.length && c.formules.every(function (f, i) { return proches(nb(r.valeurs[i]), calculer(f)); });
+    case 'choix-cle': return String(q.choix.filter(function (ch) { return ch.juste; })[0].param) === String(c.attendu);
+    case 'choix-signes': return q.choix.filter(function (ch) { return ch.juste; })[0].param === (nb(c.a) > 0 ? 'a+' : 'a-') + (nb(c.b) > 0 ? 'b+' : 'b-');
+    case 'choix-droites': {
+      var memeA = proches(nb(c.f[0]), nb(c.g[0])), memeB = proches(nb(c.f[1]), nb(c.g[1]));
+      return q.choix.filter(function (ch) { return ch.juste; })[0].param === (memeA ? 'paralleles' : memeB ? 'memeB' : 'rien') && !(memeA && memeB);
+    }
+    case 'vf-f': {
+      var vf = !!calculer(c.formule);
+      return /^<strong>(Vrai|Faux)/.exec(q.choix.filter(function (ch) { return ch.juste; })[0].h)[1] === (vf ? 'Vrai' : 'Faux');
+    }
+    case 'vf-monotone': {
+      var mono = c.ys.every(function (y, i) { return i === 0 || (y - c.ys[i - 1]) * c.dit > 0; });
+      return /^<strong>(Vrai|Faux)/.exec(q.choix.filter(function (ch) { return ch.juste; })[0].h)[1] === (mono ? 'Vrai' : 'Faux');
+    }
+    case 'sommet': {
+      // le sommet annule la parenthèse ; de part et d'autre, f s'écarte du même côté (signe de a)
+      var fs = function (x) { return c.a * (x - c.h) * (x - c.h) + c.k; }, sx = nb(r.x), sy = nb(r.y);
+      return proches(fs(sx), sy) && (fs(sx - 1) - sy) * c.a > 0 && (fs(sx + 1) - sy) * c.a > 0 && proches(fs(sx - 1), fs(sx + 1));
+    }
+    case 'racines': {
+      // les deux valeurs annulent ax² + bx + c, sont différentes et rangées dans l'ordre croissant
+      var v1 = nb(r.valeurs[0]), v2 = nb(r.valeurs[1]), pol = function (x) { return c.a * x * x + c.b * x + c.c; };
+      return r.valeurs.length === 2 && v1 < v2 && proches(pol(v1), 0) && proches(pol(v2), 0);
+    }
     case 'choix': return true;
   }
   throw new Error('genre inconnu : ' + c.genre);
@@ -178,6 +206,24 @@ function verifierBornes(q, annee, cle) {
       verifierQue(q.objectif !== 'B6', cle + ' 10e N1 : interprétation de a et b', q.objectif);
     }
     verifierQue(['genPenteDeuxPoints', 'genExpressionDeuxPoints'].indexOf(q.modele) < 0, cle + ' 10e : pente calculée (11e seulement)', q.modele);
+  }
+  if (annee === 11) {
+    if (d === 1) verifierQue(c.ops <= 1, cle + ' D1 : une seule étape', c.ops);
+    else if (d === 2) verifierQue(c.ops <= 2, cle + ' D2 : deux étapes au plus', c.ops);
+    else if (d === 3) verifierQue(c.ops <= 3, cle + ' D3 : trois étapes au plus', c.ops);
+    var fonctions = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'].indexOf(q.objectif) >= 0;
+    if (fonctions && d === 1 && ['genNomCourbe'].indexOf(q.modele) < 0) {
+      verifierQue(!(c.coefs || []).length || Math.abs(nb(c.coefs[0])) <= 4, cle + ' 11e D1 : a de – 4 à 4', c.coefs);
+    }
+    if (q.niveauEleve === 1) {
+      // N1 : coefficients entiers ; ni racine carrée, ni ax² + bx + c tracé, ni a(x – b)² + c, ni débit, ni croissance
+      if (fonctions) verifierQue((c.coefs || []).every(entier), cle + ' 11e N1 : coefficient non entier', c.coefs);
+      verifierQue(['genSommetParabole', 'genCanoniqueGraph', 'genDebit', 'genEquation2Graph'].indexOf(q.modele) < 0, cle + ' 11e N1 : contenu réservé au niveau 2', q.modele);
+      verifierQue(q.objectif !== 'C11', cle + ' 11e N1 : croissance et décroissance', q.objectif);
+      var tq = textesQuestion(q);
+      verifierQue(!/√|racine carrée/.test(tq), cle + ' 11e N1 : racine carrée', q.modele);
+      verifierQue(!/débit/i.test(tq), cle + ' 11e N1 : débit', q.modele);
+    }
   }
 }
 

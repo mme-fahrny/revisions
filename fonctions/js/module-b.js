@@ -933,7 +933,7 @@
     var def = { categories: cats, valeurs: vals, max: 14, pas: 1, lpas: 2, titreY: 'nombre d\'élèves', description: 'Diagramme en colonnes des moyens de transport' };
     return {
       type: 'lecture',
-      enonce: '<p>Le diagramme montre comment les élèves d\'une classe viennent au collège.</p>' + FICTIF + O.svgBarres(def) + '<p>Combien d\'élèves viennent ' + (cats[i] === 'à pied' ? 'à pied' : 'en ' + cats[i]) + ' ?</p>',
+      enonce: '<p>Le diagramme montre comment les élèves d\'une classe viennent au collège.</p>' + FICTIF + O.svgBarres(def) + '<p>Combien d\'élèves viennent ' + (cats[i] === 'à pied' ? 'à pied' : cats[i] === 'vélo' ? 'à vélo' : 'en ' + cats[i]) + ' ?</p>',
       indice: 'Lis la hauteur de la colonne sur l\'axe vertical. Un carreau vaut 1 élève.',
       reponse: { type: 'nombre', valeur: vals[i] },
       pieges: [],
@@ -955,7 +955,7 @@
     if (!Number.isInteger(n)) { total = 100; n = parts[i]; }
     return {
       type: 'lecture',
-      enonce: '<p>On a demandé à ' + total + ' élèves comment ils viennent au collège.</p>' + FICTIF + O.svgCirculaire({ categories: cats, parts: parts, etiquettes: parts.map(function (p) { return p + ' %'; }) }) + '<p>Combien d\'élèves viennent ' + (cats[i] === 'à pied' ? 'à pied' : 'en ' + cats[i]) + ' ?</p>',
+      enonce: '<p>On a demandé à ' + total + ' élèves comment ils viennent au collège.</p>' + FICTIF + O.svgCirculaire({ categories: cats, parts: parts, etiquettes: parts.map(function (p) { return p + ' %'; }) }) + '<p>Combien d\'élèves viennent ' + (cats[i] === 'à pied' ? 'à pied' : cats[i] === 'vélo' ? 'à vélo' : 'en ' + cats[i]) + ' ?</p>',
       indice: 'Lis le pourcentage du secteur, puis calcule ce pourcentage de ' + total + '.',
       reponse: { type: 'nombre', valeur: n },
       pieges: [{ valeur: parts[i], message: 'C\'est le pourcentage : calcule ' + parts[i] + ' % de ' + total + ' élèves.' }],
@@ -1504,5 +1504,9 @@
   ];
 
   // genPenteDeuxPoints et genExpressionDeuxPoints (pente et ordonnée à l'origine) : réservés au module C (11e).
-  return { objectifs: objectifs, tirerPente: tirerPente, genPenteDeuxPoints: genPenteDeuxPoints, genExpressionDeuxPoints: genExpressionDeuxPoints };
+  // « gens » : modèles repris tels quels par le module C (11e), calibrés selon leur difficulté d'origine.
+  return { objectifs: objectifs, tirerPente: tirerPente, genPenteDeuxPoints: genPenteDeuxPoints, genExpressionDeuxPoints: genExpressionDeuxPoints,
+    gens: { genCoefficientNul: genCoefficientNul, genLireBarres: genLireBarres, genLireCirculaire: genLireCirculaire, genAngleSecteur: genAngleSecteur,
+      genCompleterCirculaire: genCompleterCirculaire, genErreurDiagramme: genErreurDiagramme, genIntersectionGraphique: genIntersectionGraphique,
+      genIntersectionAlgebrique: genIntersectionAlgebrique, genIntersectionLireCalculer: genIntersectionLireCalculer } };
 });
