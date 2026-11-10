@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr-CH">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <title>Aperçu Algèbre</title>
+  <link rel="stylesheet" href="../assets/commun.css">
+  <link rel="stylesheet" href="algebre.css">
+  <link rel="stylesheet" href="apercu.css">
+</head>
+<body>
+  <main id="contenu" class="page apercu">
+    <header>
+      <p class="sur">Appli Calcul littéral et équations · aperçu pour l'enseignante</p>
+      <h1 id="titre-apercu">Aperçu des questions</h1>
+      <p class="intro">Pour le module, le niveau et la difficulté choisis, voici <strong>un exemple de chaque modèle de question</strong>, tiré au hasard, objectif par objectif. Chaque objectif est calibré selon les règles de son année, comme dans l'appli. Les rétroactions affichées sont celles que voit l'élève quand sa réponse correspond à l'erreur nommée. Les outils visuels sont manipulables.</p>
+      <form class="reglages-apercu" id="reglages" onsubmit="return false">
+        <fieldset><legend>Module</legend><div class="segments" data-groupe="module"></div></fieldset>
+        <fieldset><legend>Niveau</legend><div class="segments" data-groupe="niveau"></div></fieldset>
+        <fieldset><legend>Difficulté</legend><div class="segments" data-groupe="difficulte"></div></fieldset>
+        <button type="button" class="bouton-secondaire" id="tout-retirer">Nouveau tirage complet</button>
+      </form>
+      <nav class="sommaire" id="sommaire" aria-label="Années"></nav>
+    </header>
+    <div id="apercu"><noscript><p>Cet aperçu a besoin de JavaScript.</p></noscript></div>
+  </main>
+
+  <script src="../assets/maths.js"></script>
+  <script src="js/poly.js"></script>
+  <script src="js/outils.js"></script>
+  <script src="js/module-a.js"></script>
+  <script src="js/module-b.js"></script>
+  <script src="js/catalogue.js"></script>
+  <script src="js/visuels.js"></script>
+  <script src="js/apercu.js"></script>
+</body>
+</html>
