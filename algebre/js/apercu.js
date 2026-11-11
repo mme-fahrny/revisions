@@ -81,7 +81,7 @@
         art.appendChild(ol);
       } else {
         var att = htmlAttendu(q);
-        art.appendChild(el('p', { 'class': 'attendu', html: '<b>Réponse attendue</b> ' + (att || '(voir la correction)') + (q.suffixe ? ' ' + O.echapper(q.suffixe) : '') }));
+        art.appendChild(el('p', { 'class': 'attendu', html: '<b>Réponse attendue</b> ' + (att || '(voir la correction)') + (q.suffixe ? ' <span class="note-suffixe">(l\'unité « ' + O.echapper(q.suffixe) + ' » est déjà affichée à côté du champ : l\'élève n\'écrit que le nombre)</span>' : '') }));
         var pieges = (q.pieges || []).filter(function (pg) { return pg.message; });
         if (pieges.length) {
           var ul = el('ul', { 'class': 'pieges-apercu' });

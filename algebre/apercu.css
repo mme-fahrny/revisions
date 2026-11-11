@@ -40,3 +40,4 @@
 .q-apercu summary { cursor: pointer; color: var(--accent); font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .absent { font-size: .9rem; color: var(--texte-doux); font-style: italic; margin: .4rem 0; }
 .erreur-apercu { color: var(--faux); font-weight: 700; }
+.note-suffixe { font-size: .88rem; color: var(--texte-doux); }

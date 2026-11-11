@@ -45,7 +45,7 @@
     return Q({
       type: 'erreur',
       enonce: '<p>' + def.intro + '</p>' + calcul,
-      consigne: 'À quelle ligne apparaît la première erreur ?',
+      consigne: 'À quelle ligne se trouve l\'erreur ?',
       reponse: { type: 'choix' },
       mode: 'choix',
       choix: alea.melanger(choix),
@@ -86,6 +86,25 @@
     if (p >= 3) cas.push('2a3b', 'naba');
     if (p >= 4) cas.push('neg', 'neg1');
     var c = alea.choix(cas);
+    var r = casConventionBrut(c, l, l2, lp, n, m, alea);
+    var IND = {
+      nx: 'Entre un nombre et une lettre, on peut supprimer le « · » : 3 · x = 3x.',
+      xn: 'On peut supprimer le « · », mais le nombre s\'écrit DEVANT la lettre.',
+      aa: 'Un produit de lettres égales s\'écrit avec une puissance : a · a = a². Ne confonds pas avec a + a = 2a.',
+      aaa: 'Un produit de lettres égales s\'écrit avec une puissance : compte combien de fois la lettre est multipliée par elle-même.',
+      un: 'Multiplier par 1 ne change rien : x, c\'est 1 · x (le coefficient 1 ne s\'écrit pas).',
+      nxm: 'On peut changer l\'ordre des facteurs : multiplie d\'abord les nombres entre eux, puis écris la lettre.',
+      nmx: 'Il y a deux nombres à multiplier entre eux ; la lettre n\'apparaît qu\'une fois, elle reste telle quelle (2 · 3x = 6x).',
+      nab: 'Le nombre s\'écrit devant, puis les lettres (rangées par ordre alphabétique), sans « · ».',
+      '2a3b': 'Multiplie les nombres entre eux, puis écris les lettres à la suite : 2a · 3b = 6ab.',
+      naba: 'Regroupe les lettres égales : une lettre multipliée par elle-même s\'écrit avec une puissance (a · a = a²).',
+      neg: 'Multiplie d\'abord les nombres entre eux, en faisant attention au signe.',
+      neg1: 'Multiplier par (– 1) donne l\'opposé.'
+    };
+    r.indice = IND[c] || IND.neg1;
+    return r;
+  }
+  function casConventionBrut(c, l, l2, lp, n, m, alea) {
     switch (c) {
       case 'nx': return { t: n + ' · ' + l, src: n + '*' + l, att: n + l, pieges: [] };
       case 'xn': return { t: l + ' · ' + n, src: l + '*' + n, att: n + l, pieges: [], note: 'Le nombre s\'écrit devant la lettre.' };
@@ -117,7 +136,7 @@
       enonce: '<p>Écris le plus simplement possible, en respectant les conventions d\'écriture :</p><p class="calcul">' + hm(c.t) + '</p>',
       reponse: { type: 'expr', attendu: c.att, forme: 'monome', depart: c.src },
       pieges: c.pieges,
-      indice: 'On peut supprimer le « · » entre un nombre et une lettre (le nombre devant : 3 · x = 3x). ' + 'Un produit de lettres égales s\'écrit avec une puissance : a · a = a².',
+      indice: c.indice,
       etapes: [
         etape(1, 'Regrouper les nombres, puis les lettres (on peut changer l\'ordre des facteurs d\'un produit).', hm(c.t)),
         etape(2, 'Calculer le produit des nombres et écrire les lettres égales avec un exposant.' + (c.note ? ' ' + c.note : ''), hm(c.t + ' = ' + tx(c.att)))
@@ -135,6 +154,8 @@
     var bank = [
       { aff: l + ' + ' + l + ' = ' + l + '²', vrai: false, a: l + '+' + l, b: l + '^2',
         justeFaux: l + ' + ' + l + ' = 2' + l + ' (deux fois ' + l + '), alors que ' + l + ' · ' + l + ' = ' + l + '².',
+        ind: 'Rappelle-toi que ' + l + ', c\'est 1' + l + ' : le coefficient 1 ne s\'écrit pas. Que vaut 1' + l + ' + 1' + l + ' ?',
+        detail: l + ' = 1' + l + ' (le coefficient 1 ne s\'écrit pas, c\'est une convention d\'écriture). Donc ' + l + ' + ' + l + ' = 1' + l + ' + 1' + l + ' : on additionne les coefficients (1 + 1 = 2) et on garde la même partie littérale, ce qui donne 2' + l + '. L\'écriture ' + l + '² signifie ' + l + ' · ' + l + '.',
         autresFaux: ['on ne peut jamais additionner deux lettres.'],
         autresVrai: ['ajouter une lettre à elle-même donne son carré.', 'pour ' + l + ' = 2, les deux membres valent 4.'] },
       { aff: n + ' · ' + l + ' = ' + n + l, vrai: true, a: n + '*' + l, b: n + l,
@@ -143,6 +164,8 @@
         autresFaux: ['le signe « · » ne peut jamais être supprimé.', n + l + ' est un nombre à deux chiffres.'] },
       { aff: l + ' · ' + l + ' = 2' + l, vrai: false, a: l + '*' + l, b: '2' + l,
         justeFaux: l + ' · ' + l + ' = ' + l + '². Par exemple, pour ' + l + ' = 3 : 3 · 3 = 9, alors que 2 · 3 = 6.',
+        ind: 'Un produit de lettres égales s\'écrit avec une puissance. Que signifie 2' + l + ' : une addition ou une multiplication de ' + l + ' par lui-même ?',
+        detail: l + ' · ' + l + ' = ' + l + '² (produit de deux facteurs égaux). L\'écriture 2' + l + ' signifie 2 · ' + l + ' = ' + l + ' + ' + l + ' : c\'est une somme. Par exemple, pour ' + l + ' = 3 : 3 · 3 = 9, alors que 2 · 3 = 6.',
         autresFaux: [l + ' · ' + l + ' = ' + l + '.'],
         autresVrai: ['la lettre ' + l + ' apparaît deux fois.', 'c\'est la même chose que ' + l + ' + ' + l + '.'] },
       { aff: n + ' · (' + l + ' + ' + l2 + ') = ' + n + '(' + l + ' + ' + l2 + ')', vrai: true, a: n + '*(' + l + '+' + l2 + ')', b: n + '(' + l + '+' + l2 + ')',
@@ -151,6 +174,7 @@
         autresFaux: ['il faut toujours garder le « · » devant une parenthèse.', n + '(' + l + ' + ' + l2 + ') est une puissance.'] },
       { aff: '1' + l + ' = ' + l, vrai: true, a: '1*' + l, b: l,
         justeVrai: 'multiplier par 1 ne change rien : le coefficient 1 ne s\'écrit pas.',
+        ind: '1' + l + ' signifie 1 · ' + l + '. Que se passe-t-il quand on multiplie un nombre par 1 ?',
         autresVrai: ['1' + l + ' vaut toujours 1.'],
         autresFaux: ['1' + l + ' = 1 + ' + l + '.', 'on ne peut jamais supprimer un nombre.'] },
       { aff: l + ' · ' + n + ' s\'écrit ' + l + n, vrai: false, conv: true,
@@ -163,6 +187,7 @@
         autresFaux: ['le « · » ne se supprime qu\'entre deux nombres.'] },
       { aff: '0 · ' + l + ' = ' + l, vrai: false, a: '0*' + l, b: l,
         justeFaux: '0 · ' + l + ' = 0, quelle que soit la valeur de ' + l + '.',
+        ind: 'Remplace ' + l + ' par un nombre, par exemple 5 : que vaut 0 · 5 ?',
         autresFaux: ['0 · ' + l + ' = 1.'],
         autresVrai: ['multiplier par 0 ne change rien.', 'le 0 ne s\'écrit pas.'] }
     ];
@@ -171,8 +196,8 @@
       affirmation: hm(c.aff),
       vrai: c.vrai, justeVrai: c.justeVrai, justeFaux: c.justeFaux, autresVrai: c.autresVrai, autresFaux: c.autresFaux,
       rubrique: R.conventions,
-      indice: 'Relis les conventions d\'écriture : quand peut-on supprimer le « · » ? Teste aussi avec un nombre.',
-      etapes: [etape(1, c.vrai ? 'L\'affirmation est vraie : ' + c.justeVrai : 'L\'affirmation est fausse : ' + c.justeFaux, hm(c.aff))],
+      indice: c.ind || 'Relis les conventions d\'écriture : quand peut-on supprimer le « · », et où écrit-on le nombre ? Teste aussi avec un nombre.',
+      etapes: [etape(1, c.vrai ? 'L\'affirmation est vraie : ' + c.justeVrai : 'L\'affirmation est fausse : ' + (c.detail || c.justeFaux), hm(c.aff))],
       controle: c.conv ? { type: 'convention', vrai: c.vrai } : { type: 'egalite', a: c.a, b: c.b, vrai: c.vrai }
     });
   }
@@ -512,21 +537,28 @@
 
   function genTraductionPhrase(alea, p) {
     var t = alea.choix(banqueTraduction(alea, p));
+    t.simple = uneOperation(t.src);
     var pieges = t.voisins.filter(function (v) { return v[2]; }).map(function (v) { return { src: v[1], message: v[2] }; });
     return Q({
       type: 'traduction',
       enonce: '<p>Traduis par une expression littérale :</p><p class="affirmation">« ' + t.ph + ' »</p>',
       reponse: { type: 'expr', attendu: t.src, forme: null, sansContreExemple: false },
       pieges: pieges,
-      indice: 'Cherche la DERNIÈRE opération de la phrase : « le triple de la somme… » est un produit, « la somme du triple… » est une somme.',
-      etapes: [
-        etape(1, 'Repérer la dernière opération (somme, différence, produit, quotient, carré…).', echapperTexte(t.ph)),
-        etape(2, 'Écrire l\'expression, avec des parenthèses si une somme ou une différence doit être calculée en premier.', hx(t.src))
+      indice: t.simple
+        ? 'Repère le mot qui indique l\'opération (somme : +, différence : –, produit : ·, quotient : division, double : 2 ·, carré : exposant 2) et fais attention à l\'ordre des deux nombres.'
+        : 'Il y a plusieurs opérations. Demande-toi laquelle se calcule EN DERNIER : c\'est en général celle qui est nommée en premier dans la phrase. « Le triple de la somme de x et de 4 » : on calcule d\'abord la somme, et le triple en dernier ; c\'est donc un produit, avec la somme entre parenthèses : 3(x + 4). « Le triple de x, augmenté de 4 » : on ajoute 4 en dernier, c\'est une somme : 3x + 4.',
+      etapes: t.simple ? [
+        etape(1, 'Une seule opération : on repère le mot qui la désigne et l\'ordre des deux nombres.', echapperTexte(t.ph) + ' : ' + hx(t.src))
+      ] : [
+        etape(1, 'Repérer l\'opération qui se calcule en dernier (souvent nommée en premier dans la phrase) : elle donne la forme de l\'expression (somme, différence, produit, quotient, carré…).', echapperTexte(t.ph)),
+        etape(2, 'Écrire l\'expression, avec des parenthèses autour d\'une somme ou d\'une différence qui doit être calculée d\'abord.', hx(t.src))
       ],
       rubrique: R.expression,
       controle: { type: 'expr' }
     });
   }
+  /** Vrai si l'expression ne contient qu'une opération (le double de x, x – 5, x², n + 1…). */
+  function uneOperation(src) { return /^(-?\d*[a-z](\^2)?|[a-z0-9][-+\/][a-z0-9])$/.test(src) && src !== '-2x'; }
   function echapperTexte(t) { return O.echapper('« ' + t + ' »'); }
 
   function genTraductionExpression(alea, p) {
@@ -544,8 +576,8 @@
       enonce: '<p>Quelle phrase correspond à l\'expression ' + hx(t.src) + ' ?</p>',
       reponse: { type: 'choix' }, mode: 'choix',
       choix: alea.melanger(options).map(function (o) { return { h: '« ' + O.echapper(o.h) + ' »', juste: o.juste, message: o.message }; }),
-      indice: 'Quelle est la dernière opération à effectuer dans l\'expression ? C\'est elle qui donne le début de la phrase.',
-      etapes: [etape(1, 'La dernière opération à effectuer donne le début de la phrase.', hx(t.src) + ' : « ' + O.echapper(t.ph) + ' »')],
+      indice: uneOperation(t.src) ? 'Quelle opération vois-tu dans l\'expression (addition, soustraction, multiplication, division, puissance) ? Dans quel ordre sont les deux nombres ?' : 'Si tu calculais cette expression avec un nombre, quelle opération ferais-tu EN DERNIER ? C\'est elle qui donne le début de la phrase (la somme de…, le produit de…, le triple de…).',
+      etapes: [etape(1, uneOperation(t.src) ? 'On nomme l\'opération, en respectant l\'ordre des deux nombres.' : 'L\'opération que l\'on calcule en dernier donne le début de la phrase.', hx(t.src) + ' : « ' + O.echapper(t.ph) + ' »')],
       rubrique: R.sommeProduit,
       controle: { type: 'traduction', src: t.src, options: options.map(function (o) { return o.h; }) }
     });
@@ -663,9 +695,11 @@
       q = {
         enonce: '<p>Quel est le <strong>degré</strong> du monôme ' + hx(src) + ' ?</p>',
         reponse: { type: 'nombre', valeur: fr(deg) },
-        pieges: [{ valeur: Math.max.apply(null, exps), message: 'Le degré est la SOMME des exposants de toutes les lettres, pas le plus grand exposant.' },
-          { valeur: Object.keys(m.l).length, message: 'Le degré est la somme des exposants, pas le nombre de lettres.' }].filter(function (pg) { return pg.valeur !== deg; }),
-        etapes: [etape(1, 'Additionner les exposants de la partie littérale (une lettre sans exposant a l\'exposant 1).', hm(Object.keys(m.l).sort().map(function (k) { return k + ' : ' + m.l[k]; }).join(' ; ') + ' → ' + exps.join(' + ') + ' = ' + deg))],
+        pieges: (Math.max.apply(null, exps) === Object.keys(m.l).length
+          ? [{ valeur: Math.max.apply(null, exps), message: 'Le degré est la SOMME des exposants de toutes les lettres : ici ' + exps.join(' + ') + '.' }]
+          : [{ valeur: Math.max.apply(null, exps), message: 'Le degré est la SOMME des exposants de toutes les lettres, pas le plus grand exposant.' },
+            { valeur: Object.keys(m.l).length, message: 'Le degré est la somme des exposants, pas le nombre de lettres.' }]).filter(function (pg) { return pg.valeur !== deg; }),
+        etapes: [etape(1, 'Additionner les exposants de la partie littérale.' + (rappelExposant1(m) || '') , hm(Object.keys(m.l).sort().map(function (k) { return k + ' : ' + m.l[k]; }).join(' ; ') + ' → ' + exps.join(' + ') + ' = ' + deg))],
         controle: { type: 'monome', src: src, quoi: 'degre' }
       };
     } else {
@@ -885,8 +919,21 @@
     return [
       etape(1, 'Repérer les monômes semblables (même partie littérale) et les regrouper, chacun avec son signe.', hx(O.srcTermes(regroupe))),
       etape(2, 'Additionner les coefficients des monômes semblables.', details),
-      etape(3, ordre ? 'Écrire le polynôme réduit et ordonné (degrés décroissants).' : 'Écrire le polynôme réduit.', hx(P.src(red)))
+      etape(3, red.length <= 1 ? 'Écrire l\'expression réduite : tous les monômes étaient semblables, il ne reste qu\'un seul monôme.' : (ordre ? 'Écrire le polynôme réduit et ordonné (degrés décroissants).' : 'Écrire le polynôme réduit.'), hx(P.src(red)))
     ];
+  }
+
+  /** Comme etapesReduction, mais dit clairement quand il n'y a rien à réduire. */
+  function etapesReduireOuOrdonner(termes, red) {
+    if (red.length < termes.length) return etapesReduction(termes, red, true);
+    var deja = O.srcTermes(termes) === P.src(red) || tx(O.srcTermes(termes)) === tx(P.src(red));
+    return [etape(1, 'Aucun monôme n\'est semblable à un autre (les parties littérales sont toutes différentes) : le polynôme est déjà réduit.' +
+      (deja ? ' Il est aussi déjà ordonné.' : ' On l\'ordonne selon les degrés décroissants, chaque terme gardant son signe.'), hx(P.src(red)))];
+  }
+  /** Rappel : une lettre sans exposant a l'exposant 1 (x = x¹). */
+  function rappelExposant1(m) {
+    var k = Object.keys(m.l).filter(function (x) { return m.l[x] === 1; });
+    return k.length ? ' Rappel : ' + k[0] + ' = ' + k[0] + '¹ (l\'exposant 1 ne s\'écrit pas, mais il compte).' : '';
   }
 
   function genReduire(alea, p, ctx) {
@@ -901,11 +948,11 @@
     var lettrePrinc = t.lettres[0];
     if (!toutMelange.estZero()) {
       var l = {}; l[lettrePrinc] = 1;
-      pieges.push({ src: P.srcMonome({ c: toutMelange, l: l }), message: 'Tu as additionné des termes qui ne sont pas semblables : 3a + 2b ne fait pas 5ab, et 4 + 5x² ne fait pas 9x² (ces sommes ne se réduisent pas).' });
+      pieges.push({ src: P.srcMonome({ c: toutMelange, l: l }), message: 'Tu as additionné des ' + (annee < 10 ? 'termes' : 'monômes') + ' qui ne sont pas semblables : 3a + 2b ne fait pas 5ab, et 4 + 5x² ne fait pas 9x² (ces sommes ne se réduisent pas).' });
     }
     return Q({
       type: tuiles && p <= 3 ? 'visuel' : 'directe',
-      enonce: '<p>' + (ordonner ? 'Réduis et ordonne' : 'Réduis') + ' le polynôme</p><p class="calcul">' + hx(src) + '</p>',
+      enonce: '<p>' + (ordonner ? 'Réduis et ordonne' : 'Réduis') + (t.red.length <= 1 || annee < 10 ? ' l\'expression' : ' le polynôme') + '</p><p class="calcul">' + hx(src) + '</p>',
       consigne: tuiles && p <= 3 ? 'Les tuiles algébriques montrent les termes : touche deux tuiles opposées pour les annuler, ou regroupe les tuiles semblables.' : '',
       reponse: { type: 'expr', attendu: P.src(t.red), forme: ordonner ? 'ordonnee' : 'reduite', depart: src, lettre: t.lettres.length === 1 ? t.lettres[0] : null },
       pieges: pieges,
@@ -1013,15 +1060,16 @@
     });
   }
 
-  function genReduireVF(alea, p) {
+  function genReduireVF(alea, p, ctx) {
     var n = alea.entier(2, 9), m = alea.entier(2, 9);
+    var mot = ctx && ctx.objectifAnnee < 10 ? 'termes' : 'monômes';
     var bank = [
-      { a: n + '+' + m + 'x', b: (n + m) + 'x', vrai: false },
+      { a: n + '+' + m + 'x', b: (n + m) + 'x', vrai: false, raison: n + ' et ' + m + 'x ne sont pas des ' + mot + ' semblables (pas la même partie littérale) : on ne peut pas les additionner.' },
       { a: n + '+' + m + 'x^2', b: n + '+' + m + 'x^2', aff: n + ' + ' + m + 'x² ne se réduit pas', vrai: true, special: true },
       { a: n + 'x+' + m + 'x', b: (n + m) + 'x', vrai: true },
-      { a: n + 'x^2+' + m + 'x', b: (n + m) + 'x^3', vrai: false },
+      { a: n + 'x^2+' + m + 'x', b: (n + m) + 'x^3', vrai: false, raison: n + 'x² et ' + m + 'x ne sont pas des ' + mot + ' semblables (pas la même partie littérale) : on ne peut pas les additionner.' },
       { a: n + 'x-' + m + '-x', b: (n - 1) + 'x-' + m, vrai: true },
-      { a: n + 'x^2-x^2', b: String(n), vrai: false }
+      { a: n + 'x^2-x^2', b: String(n), vrai: false, raison: 'on soustrait les coefficients et on garde la partie littérale : ' + n + 'x² – 1x² = ' + (n - 1 === 1 ? '' : n - 1) + 'x².' }
     ];
     var c = alea.choix(bank);
     var aff = c.aff || (tx(c.a) + ' = ' + tx(c.b));
@@ -1030,11 +1078,11 @@
     return qVraiFaux(alea, {
       affirmation: hm(aff), vrai: c.vrai,
       justeVrai: c.special ? n + ' et ' + m + 'x² ne sont pas semblables (pas la même partie littérale).' : 'en réduisant le membre de gauche, on obtient ' + red + '.',
-      justeFaux: ce ? 'pour ' + O.texteValeurs(ce.valeurs) + ', ' + tx(c.a) + ' vaut ' + tn(ce.va) + ' et ' + tx(c.b) + ' vaut ' + tn(ce.vb) + ' (contre-exemple).' : '',
+      justeFaux: ce ? (c.raison ? c.raison + ' Contre-exemple : ' : '') + 'pour ' + O.texteValeurs(ce.valeurs) + ', ' + tx(c.a) + ' vaut ' + tn(ce.va) + ' et ' + tx(c.b) + ' vaut ' + tn(ce.vb) + (c.raison ? '.' : ' (contre-exemple).') : '',
       autresVrai: c.vrai ? ['les deux membres ont les mêmes lettres.'] : ['on additionne tous les coefficients.', 'les deux membres contiennent la lettre x.'],
       autresFaux: c.vrai ? ['pour x = 0, les deux membres ont une valeur différente.', 'on ne peut jamais additionner des monômes.'] : ['les coefficients sont différents.'],
       rubrique: c.special ? R.reduction : R.egalite,
-      etapes: [etape(1, c.vrai ? 'On réduit le membre de gauche : on obtient le membre de droite.' : 'Un contre-exemple suffit à prouver que l\'égalité est fausse.', ce ? hm(O.substituerTexte(c.a, ce.valeurs) + ' = ' + tn(ce.va) + ' ≠ ' + tn(ce.vb)) : hm(tx(c.a) + ' = ' + red))],
+      etapes: [etape(1, c.vrai ? 'On réduit le membre de gauche : on obtient le membre de droite.' : (c.raison ? c.raison.charAt(0).toUpperCase() + c.raison.slice(1) + ' ' : '') + 'Un contre-exemple suffit à prouver que l\'égalité est fausse.', ce ? hm(O.substituerTexte(c.a, ce.valeurs) + ' = ' + tn(ce.va) + ' ≠ ' + tn(ce.vb)) : hm(tx(c.a) + ' = ' + red))],
       controle: { type: 'egalite', a: c.a, b: c.b, vrai: c.vrai }
     });
   }
@@ -1241,7 +1289,7 @@
       ];
     } else {
       etapes = [
-        etape(1, 'Les parenthèses précédées du signe « + » (ou d\'aucun signe) peuvent être supprimées.', hx(O.srcTermes(P.ordonner(A).concat(P.ordonner(B))))),
+        etape(1, 'Les parenthèses précédées du signe « + » (ou d\'aucun signe) peuvent être supprimées : ce sont des parenthèses inutiles.', hx(O.srcTermes(P.ordonner(A).concat(P.ordonner(B))))),
         etape(2, 'Réduire et ordonner.', hp(res))
       ];
     }
@@ -1251,7 +1299,7 @@
       enonce: '<p>' + (sous ? 'Soustrais' : 'Additionne') + ' ces polynômes, puis réduis ' + (lettre ? 'et ordonne ' : '') + 'le résultat :</p><p class="calcul">' + hm(affiche) + '</p>',
       reponse: { type: 'expr', attendu: P.src(res), forme: lettre ? 'ordonnee' : 'reduite', depart: src, lettre: lettre },
       pieges: pieges,
-      indice: sous ? 'Pour soustraire un polynôme, on additionne son opposé : change le signe de chacun de ses termes.' : 'Supprime les parenthèses, puis additionne les monômes semblables.',
+      indice: sous ? 'Pour soustraire un polynôme, on additionne son opposé : change le signe de chacun de ses termes.' : 'Supprime les parenthèses inutiles (celles qui sont précédées d\'un « + » ou d\'aucun signe), puis additionne les monômes semblables.',
       etapes: etapes,
       verification: verifSubst(src, P.src(res), valeursTest(src), affiche),
       rubrique: R.parentheses,
@@ -1364,8 +1412,8 @@
         type: 'directe',
         enonce: '<p>On réduit le polynôme ' + hx(src) + '.</p><p>Quel est le coefficient du terme ' + (d0 ? 'en ' + hm(P.partieLitterale({ l: lc })) : 'constant') + ' ?</p>',
         reponse: { type: 'nombre', valeur: cf },
-        indice: 'Réduis d\'abord le polynôme : additionne les monômes semblables.',
-        etapes: etapesReduction(termes, red, true).concat([etape(4, 'Lire le coefficient du terme ' + (d0 ? 'en ' + P.partieLitterale({ l: lc }) : 'constant') + '.', hn(cf))]),
+        indice: 'Y a-t-il des monômes semblables ? Si oui, réduis d\'abord le polynôme. Le coefficient se lit avec son signe.',
+        etapes: etapesReduireOuOrdonner(termes, red).concat([etape(4, 'Lire le coefficient du terme ' + (d0 ? 'en ' + P.partieLitterale({ l: lc }) : 'constant') + '.', hn(cf))]),
         rubrique: R.polynome,
         controle: { type: 'coefPoly', src: src, l: lc }
       });
@@ -1377,7 +1425,7 @@
       reponse: { type: 'nombre', valeur: fr(deg) },
       pieges: pieges,
       indice: 'Le degré d\'un polynôme est le plus haut degré de ses termes APRÈS réduction. Le degré d\'un monôme est la somme des exposants de ses lettres.',
-      etapes: etapesReduction(termes, red, true).concat([etape(4, 'Le terme de plus haut degré est ' + tx(P.srcMonome(red[0])) + ' : degré ' + deg + '.', hn(deg))]),
+      etapes: etapesReduireOuOrdonner(termes, red).concat([etape(4, 'Le terme de plus haut degré est ' + tx(P.srcMonome(red[0])) + ' : degré ' + deg + '.' + (p <= 2 ? rappelExposant1(red[0]) : ''), hn(deg))]),
       rubrique: R.polynome,
       controle: { type: 'degre', src: src }
     });
@@ -1664,20 +1712,20 @@
   function genPreuve(alea, p) {
     var c = alea.choix(p <= 2 ? PREUVES.filter(function (x) { return !x.difference && Maths.lettres(x.termes.join('+')).length === 1; }) : PREUVES);
     var src = c.difference ? c.termes[0] + '-' + c.termes[1] : c.termes.map(function (t) { return '(' + t + ')'; }).join('+');
-    var factoriser = !!c.fact && p >= 3 && alea.suivant() < 0.75;
+    var factoriser = !!c.fact; // on va au bout de la preuve : la forme factorisée montre la propriété
     var att = factoriser ? c.fact : c.somme;
     var lettres = Maths.lettres(src);
     var nomsTermes = c.termes.map(function (t) { return tx(t); }).join(' ; ');
     return Q({
       type: 'probleme',
       enonce: '<p>On veut prouver que <strong>' + c.enonce + '</strong>.</p><p>On note ' + lettres.join(' et ') + ' ' + (lettres.length > 1 ? 'des nombres entiers quelconques (indéterminées)' : 'un nombre entier quelconque (indéterminée)') + ' : les nombres s\'écrivent ' + hm(nomsTermes) + '.</p>' +
-        '<p>' + (c.difference ? 'Écris la différence ' + hx(src) : 'Écris leur somme') + (factoriser ? ' sous une forme factorisée qui montre la propriété.' : ' sous forme réduite.') + '</p>',
+        '<p>' + (c.difference ? 'Écris la différence ' + hx(src) : 'Écris leur somme') + (factoriser ? ', réduis-la, puis écris-la sous la forme factorisée qui montre la propriété (par exemple 4(n + 3) montre un multiple de 4).' : ' sous forme réduite : c\'est elle qui montre la propriété.') + '</p>',
       reponse: { type: 'expr', attendu: att, forme: factoriser ? 'factorisee' : 'reduite', depart: src },
-      indice: factoriser ? 'Réduis la somme, puis mets en évidence le facteur qui montre la propriété.' : 'Supprime les parenthèses et réduis.',
+      indice: factoriser ? 'Supprime les parenthèses inutiles et réduis la somme, puis mets en évidence le nombre dont on veut montrer un multiple.' : 'Supprime les parenthèses et réduis. Un nombre impair s\'écrit « un nombre pair + 1 ».',
       etapes: [
         etape(1, 'Écrire le calcul avec l\'indéterminée.', hx(src)),
         etape(2, 'Réduire.', hx(c.somme))
-      ].concat(factoriser ? [etape(3, 'Factoriser.', hx(c.fact))] : []).concat([etape(factoriser ? 4 : 3, 'Conclure : ' + c.conclusion + ' Un exemple numérique ne suffit pas : le calcul littéral prouve la propriété pour TOUS les entiers.', '')]),
+      ].concat(factoriser ? [etape(3, 'Factoriser (mise en évidence) : le facteur commun fait apparaître la propriété.', hx(c.fact))] : []).concat([etape(factoriser ? 4 : 3, 'Conclure : ' + c.conclusion + ' Un exemple numérique ne suffit pas : le calcul littéral prouve la propriété pour TOUS les entiers.', '')]),
       rubrique: R.preuve,
       controle: { type: 'expr' }
     });
@@ -1688,6 +1736,22 @@
     var n = alea.entier(3, 20);
     var ex = c.termes.map(function (t) { var v = {}; Maths.lettres(t).forEach(function (l, i) { v[l] = n + i; }); return Maths.evaluer(t, v); });
     var calc = c.difference ? tn(ex[0]) + ' – ' + tn(ex[1]) + ' = ' + tn(ex[0].moins(ex[1])) : ex.map(tn).join(' + ') + ' = ' + tn(ex.reduce(function (s, x) { return s.plus(x); }, new F(0)));
+    if (alea.suivant() < 0.5) {
+      // le calcul littéral réellement utilisé comme preuve : l'affirmation est vraie
+      var litt = (c.difference ? tx(c.termes[0]) + ' – ' + tx(c.termes[1]) : c.termes.map(function (t, i) { return i && /[+]/.test(t) ? '(' + tx(t) + ')' : tx(t); }).join(' + ')) + ' = ' + tx(c.somme) + (c.fact ? ' = ' + tx(c.fact) : '');
+      var noms = Maths.lettres(c.termes.join('+'));
+      return qVraiFaux(alea, {
+        affirmation: 'Pour ' + (noms.length > 1 ? 'des entiers ' + noms.join(' et ') + ' quelconques' : 'un entier ' + noms[0] + ' quelconque') + ', le calcul ' + hm(litt) + ' prouve que ' + c.enonce + '.',
+        vrai: true,
+        justeVrai: 'le calcul est fait avec ' + (noms.length > 1 ? 'des indéterminées' : 'une indéterminée') + ' : il est valable pour TOUS les entiers, et la forme obtenue montre la propriété. ' + c.conclusion,
+        autresVrai: ['en remplaçant ' + noms[0] + ' par ' + n + ', on trouve bien un nombre qui a cette propriété.'],
+        autresFaux: ['un calcul avec des lettres ne prouve rien : il faut des exemples numériques.', 'il faudrait vérifier tous les nombres entiers un par un.'],
+        rubrique: R.preuve,
+        indice: 'Le calcul est-il fait sur un exemple, ou avec une lettre qui représente n\'importe quel entier ? La dernière forme montre-t-elle la propriété ?',
+        etapes: [etape(1, 'Le calcul utilise ' + (noms.length > 1 ? 'des indéterminées' : 'une indéterminée') + ' : il vaut pour tous les entiers.', hm(litt)), etape(2, 'Conclure : ' + c.conclusion, '')],
+        controle: { type: 'convention', vrai: true }
+      });
+    }
     return qVraiFaux(alea, {
       affirmation: 'Le calcul ' + hm(calc) + ' prouve que ' + c.enonce + '.',
       vrai: false,
