@@ -382,3 +382,7 @@ mark.signe-cible {
 .svg-figure .retire { fill: none; stroke: var(--texte-doux); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .svg-figure .angle-droit { fill: none; stroke: var(--texte); stroke-width: 1.5; }
 .svg-figure .cote { fill: var(--texte); font-size: 17px; font-family: var(--police-maths); font-weight: 700; }
+
+/* Signe « = » surmonté de « ? » (à vérifier) ou de « ! » (vérifié) */
+.egal-sur { position: relative; display: inline-block; margin: 0 .35em; padding-top: .55em; font-family: var(--police-maths); font-size: 1.1em; line-height: 1; }
+.egal-sur-signe { position: absolute; left: 50%; top: 0; transform: translateX(-50%); font-size: .7em; font-weight: 700; color: var(--accent); }

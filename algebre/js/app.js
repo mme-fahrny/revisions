@@ -187,7 +187,7 @@
 
   function afficherQuestion() {
     etat.ecran = 'question';
-    etat.repondu = false; etat.choix = null; etat.visuel = null;
+    etat.repondu = false; etat.choix = null; etat.visuel = null; etat.essai = 0;
     var q = etat.serie[etat.index];
     var r = vider();
     var total = etat.serie.length;
@@ -267,8 +267,22 @@
       retour.appendChild(el('p', {}, [el('strong', { texte: 'À corriger : ' }), el('span', { texte: res.message })]));
       return;
     }
+    // première réponse fausse : un deuxième essai avant d'afficher la solution
+    if (!res.juste && !etat.essai) {
+      etat.essai = 1;
+      retour.className = 'retour info';
+      retour.innerHTML = '';
+      retour.appendChild(el('p', {}, [el('strong', { texte: res.statut === 'forme' ? 'Forme non conforme. ' : 'Pas encore. ' }),
+        el('span', { texte: (res.statut === 'forme' && res.message ? res.message + ' ' : '') + 'Cherche ton erreur (tu peux afficher un indice), puis essaie une deuxième fois.' })]));
+      if (q.mode === 'choix') {
+        var faux1 = racine().querySelectorAll('.choix-reponses .option')[etat.choix];
+        if (faux1) { faux1.classList.add('option-fausse'); var in1 = faux1.querySelector('input'); in1.checked = false; in1.disabled = true; }
+        etat.choix = null;
+      }
+      return;
+    }
     etat.repondu = true;
-    etat.resultats.push({ q: q, juste: res.juste, statut: res.statut });
+    etat.resultats.push({ q: q, juste: res.juste, statut: res.statut, essais: etat.essai + 1 });
     enregistrerResultat(q.compte === false ? q.objectif + ' (plus loin)' : q.objectif, res.juste);
     if (etat.clavier) etat.clavier.element.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
     var champ = $('#reponse'); if (champ) champ.readOnly = true;
@@ -277,13 +291,14 @@
       racine().querySelectorAll('.choix-reponses .option').forEach(function (lab, i) {
         if (q.choix[i].juste) lab.classList.add('option-juste');
         else if (i === etat.choix) lab.classList.add('option-fausse');
+        else lab.classList.remove('option-fausse');
       });
     }
     $('#verifier').hidden = true;
     $('#bouton-indice').hidden = true;
     retour.className = 'retour ' + (res.juste ? 'juste' : 'faux');
     retour.innerHTML = '';
-    if (res.juste) retour.appendChild(el('p', {}, [el('strong', { texte: 'Juste !' }), res.message ? el('span', { texte: ' ' + res.message }) : null]));
+    if (res.juste) retour.appendChild(el('p', {}, [el('strong', { texte: etat.essai ? 'Juste au deuxième essai !' : 'Juste !' }), res.message ? el('span', { texte: ' ' + res.message }) : null]));
     else {
       retour.appendChild(el('p', {}, [el('strong', { texte: res.statut === 'forme' ? 'Forme non conforme. ' : 'Pas tout à fait. ' }), el('span', { texte: res.message })]));
       if (q.attenduHtml && q.mode !== 'choix') retour.appendChild(el('p', {}, [el('span', { texte: 'Réponse attendue : ' }), el('span', { 'class': 'maths', html: q.attenduHtml })]));

@@ -432,9 +432,11 @@ function controlerBornes(q, ident, d, niveau, anneeObjectif) {
     if (!c.special) verifierQue(etapesEquation(c.g, c.d) <= ETAPES_MAX[d], 'trop d\'étapes de résolution', ident + ' ' + etapesEquation(c.g, c.d) + ' : ' + c.g + ' = ' + c.d);
     var nat = natureSolution(r);
     var permises;
-    if (d <= 3 || /graph/.test(id)) permises = ['entier'];
-    else if (anneeObjectif === 10) permises = niveau === 2 ? ['entier', 'fraction', 'decimal', 'vide', 'tous'] : ['entier'];
-    else permises = niveau === 2 ? ['entier', 'fraction', 'decimal', 'vide', 'tous'] : ['entier', 'decimal'];
+    // S = { } et S = ℝ : dès D3 pour la résolution (deux niveaux), en D4 seulement pour la voie graphique
+    if (d <= 2 || (d === 3 && /graph/.test(id))) permises = ['entier'];
+    else if (d === 3 || /graph/.test(id)) permises = ['entier', 'vide', 'tous'];
+    else if (anneeObjectif === 10) permises = niveau === 2 ? ['entier', 'fraction', 'decimal', 'vide', 'tous'] : ['entier', 'vide', 'tous'];
+    else permises = niveau === 2 ? ['entier', 'fraction', 'decimal', 'vide', 'tous'] : ['entier', 'decimal', 'vide', 'tous'];
     verifierQue(permises.indexOf(nat) >= 0, 'solution hors calibrage (' + nat + ')', ident + ' ' + c.g + ' = ' + c.d);
     if (nat === 'fraction') verifierQue(Number(F.depuis(r.valeurs[0]).den) <= 5, 'fraction non simple', ident);
     if (anneeObjectif === 10 && d === 1 && /res/.test(id)) verifierQue(/^x[+-]\d+$|^\d+\+x$/.test(c.g.replace(/\s/g, '')) && /^-?\d+$/.test(c.d), 'D1 (10e) : forme x + a = b attendue', ident + ' ' + c.g + ' = ' + c.d);
@@ -457,7 +459,7 @@ function controlerBornes(q, ident, d, niveau, anneeObjectif) {
     var cf = [];
     c.equations.forEach(function (e) { var f0 = Maths.evaluer(e[0], { x: 0, y: 0 }); cf.push(Maths.evaluer(e[0], { x: 1, y: 0 }).moins(f0).abs().valeur(), Maths.evaluer(e[0], { x: 0, y: 1 }).moins(f0).abs().valeur()); });
     if (q.type !== 'probleme') verifierQue(cf.every(function (x) { return x <= max; }), 'système : coefficient trop grand', ident + ' ' + JSON.stringify(c.equations));
-    if (d <= 2 && q.type !== 'probleme') verifierQue(cf[0] === 1, 'système : substitution attendue en D1-D2 (coefficient 1)', ident + ' ' + JSON.stringify(c.equations));
+    if (d <= 2 && q.type !== 'probleme' && q.type !== 'visuel') verifierQue(cf[0] === 1 || cf[0] === cf[2], 'système : substitution (coefficient 1) ou addition (coefficients de x opposés) attendue en D1-D2', ident + ' ' + JSON.stringify(c.equations));
     if (d <= 3 && r.type === 'couple') verifierQue(F.depuis(r.x).estEntier() && F.depuis(r.y).estEntier(), 'système : solution non entière avant D4', ident);
   }
   if (id === 'B11-deg2' && c.type === 'deg2') {

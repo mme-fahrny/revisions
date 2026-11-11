@@ -189,13 +189,32 @@ async function repondre(page, juste, ctx) {
     // sans exemple de réponse fausse (contre-exemple : toute valeur convient), on répond juste
     if (!juste && q.mode !== 'choix' && !ex.faux.length) juste = true;
     r.juste = juste;
-    if (q.mode === 'choix') r.index = q.choix.findIndex(function (c) { return c.juste === juste; });
+    if (q.mode === 'choix') {
+      r.index = q.choix.findIndex(function (c) { return c.juste === juste; });
+      // deuxième essai : une autre réponse fausse s'il y en a une, sinon la bonne
+      if (!juste) {
+        r.index2 = q.choix.findIndex(function (c, i) { return !c.juste && i !== r.index; });
+        if (r.index2 < 0) { r.index2 = q.choix.findIndex(function (c) { return c.juste; }); r.justeFinal = true; }
+      }
+    }
     else r.texte = juste ? ex.justes[0] : ex.faux[0];
     return r;
   }, juste);
   if (info.mode === 'choix') await toucher(page, 'label[for="choix-' + info.index + '"]');
   else await page.fill('#reponse', info.texte);
   await toucher(page, '#verifier');
+  if (!info.juste) {
+    // première réponse fausse : un deuxième essai est proposé, sans la correction
+    var classe1 = await page.getAttribute('#retour', 'class');
+    verifier(/info/.test(classe1) && /deuxième fois/.test(await page.textContent('#retour')), 'deuxième essai non proposé (' + ctx + ' ' + info.objectif + ') : ' + await page.textContent('#retour'));
+    verifier(await page.locator('.correction').count() === 0, 'correction affichée avant le deuxième essai (' + info.objectif + ')');
+    if (info.mode === 'choix') {
+      verifier(await page.isDisabled('#choix-' + info.index), 'la réponse fausse reste sélectionnable (' + info.objectif + ')');
+      await toucher(page, 'label[for="choix-' + info.index2 + '"]');
+    }
+    await toucher(page, '#verifier');
+    if (info.justeFinal) info.juste = true;
+  }
   var classe = await page.getAttribute('#retour', 'class');
   juste = info.juste;
   verifier(!/info/.test(classe), 'réponse jugée illisible (' + ctx + ' ' + info.objectif + ') : ' + JSON.stringify(info) + ' → ' + await page.textContent('#retour'));

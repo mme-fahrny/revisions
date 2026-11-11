@@ -781,9 +781,23 @@
         return true;
       });
     }
+    // deux pièges identiques ne peuvent pas être distingués : on garde le premier
+    if (q.pieges) {
+      q.pieges = q.pieges.filter(function (pg, i, t) {
+        return !t.slice(0, i).some(function (o) {
+          try {
+            if (pg.valeur !== undefined && o.valeur !== undefined) return val(pg.valeur).egal(val(o.valeur));
+            if (pg.src !== undefined && o.src !== undefined) return Maths.equivalentes(pg.src, o.src);
+          } catch (e) { /* comparaison impossible : on garde les deux */ }
+          return false;
+        });
+      });
+    }
     q.verifier = function (texte) { return verifier(q, texte); };
     q.exemples = function () { return exemples(q); };
     if (!q.etapes) q.etapes = [];
+    // une seule étape : pas de titre « ÉTAPE 1 »
+    if (q.etapes.length === 1) q.etapes[0] = { titre: '', texte: q.etapes[0].texte, calcul: q.etapes[0].calcul };
     if (q.reponse.type === 'expr' || q.reponse.type === 'formule') {
       q.attenduHtml = q.attenduHtml || hx(q.reponse.attendu);
       if (!q.clavier) {
