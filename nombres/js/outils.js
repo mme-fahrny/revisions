@@ -912,7 +912,8 @@
       case 'liste': return (r.textesHtml || r.valeurs.map(function (v) { return typeof v === 'number' ? H.n(Maths.Fraction.depuis(v)) : H.f(v); })).join(NBSP + '; ');
       case 'entre':
         if (r.reels) return 'un nombre strictement compris entre ' + r.minTexte + ' et ' + r.maxTexte + ', par exemple ' + H.n(Maths.Fraction.depuis(Number(((r.minR + r.maxR) / 2).toFixed(3))));
-        return 'un nombre strictement compris entre ' + H.f(r.min) + ' et ' + H.f(r.max) + ', par exemple ' + H.f(val(r.min).plus(val(r.max)).divise(2));
+        var ecrire = val(r.min).estDecimale() && val(r.max).estDecimale() ? H.n : H.f;   // même écriture que l'énoncé
+        return 'un nombre strictement compris entre ' + ecrire(val(r.min)) + ' et ' + ecrire(val(r.max)) + ', par exemple ' + ecrire(val(r.min).plus(val(r.max)).divise(2));
       case 'coloriage': return String(val(r.valeur).fois(r.parts).num) + ' parts sur ' + r.parts;
     }
     return '';

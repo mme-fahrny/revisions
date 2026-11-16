@@ -400,7 +400,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .frac {
   display: inline-flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;      /* la barre couvre toute la largeur, même si le numérateur est plus court */
+  text-align: center;
   vertical-align: middle;
   margin: 0 .1em;
   font-size: .9em;

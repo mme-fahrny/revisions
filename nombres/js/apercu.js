@@ -32,9 +32,23 @@
   function liste(t) { return t.length > 1 ? t.slice(0, -1).join(', ') + ' et ' + t[t.length - 1] : String(t[0]); }
 
   /* ---------- Disponibilité d'un modèle (mêmes règles que Nombres.creerQuestion) ---------- */
-  function contexte(o, niveau, p) { return { annee: o.annee, niveau: niveau, palier: p }; }
-  function estActif(o, m, niveau, p) {
-    return (!m.palierMin || p >= m.palierMin) && (!m.si || !!m.si(contexte(o, niveau, p), p));
+  /** d : difficulté choisie (curseur 1 à 4). Le palier interne vaut d au niveau 1 et d + 1 au niveau 2. */
+  function contexte(o, niveau, d) { return { annee: o.annee, niveau: niveau, palier: N.palier(d, niveau), curseur: d }; }
+  function estActif(o, m, niveau, d) { return N.modeleActif(o, m, contexte(o, niveau, d)); }
+
+  /* ---------- Paliers internes D1 à D5 ---------- */
+  var LEGENDE_D = [null,
+    'D1 (niveau 1 seulement) : la base — une seule étape, petits nombres, application directe.',
+    'D2 : deux étapes, nombres jusqu\'à 100.',
+    'D3 : deux à trois étapes, nombres jusqu\'à 200.',
+    'D4 : trois étapes au plus, nombres jusqu\'à 300 ; le plus exigeant du niveau 1.',
+    'D5 (niveau 2 seulement) : questions reprises des activités du niveau 2 — opérations à trou, écritures mêlées, notions combinées, problèmes moins guidés ; nombres jusqu\'à 500.'
+  ];
+  function legendePalier(o) {
+    var ctx = contexte(o, etat.niveau, etat.difficulte);
+    if (o.niveaux.length === 1) return { etiquette: 'crans 1 à 4 conservés', texte: 'Objectif réservé au niveau 2 : ses quatre crans existants sont conservés tels quels (ils valent D2 à D5).' };
+    if (N.palierObjectif(o, ctx.palier, ctx) !== ctx.palier) return { etiquette: 'pas encore recalibré', texte: 'Module pas encore recalibré sur 5 paliers : pour l\'instant, la difficulté y est la même aux deux niveaux.' };
+    return { etiquette: 'palier D' + ctx.palier, texte: LEGENDE_D[ctx.palier] };
   }
   /** Phrase « proposé seulement… » pour un modèle absent aux réglages choisis. */
   function raisonAbsence(o, m) {
@@ -132,7 +146,7 @@
   function tirer(o, m) {
     var seul = Object.create(o);
     seul.modeles = [m];
-    return N.creerQuestion(seul, new O.Maths.Alea(), N.palier(etat.difficulte, etat.niveau), contexte(o, etat.niveau, N.palier(etat.difficulte, etat.niveau)), {}, false);
+    return N.creerQuestion(seul, new O.Maths.Alea(), N.palier(etat.difficulte, etat.niveau), contexte(o, etat.niveau, etat.difficulte), {}, false);
   }
 
   function carte(o, m, numero, repli) {
@@ -214,8 +228,8 @@
     var zone = doc.getElementById('apercu'), sommaire = doc.getElementById('sommaire');
     zone.textContent = ''; sommaire.textContent = '';
     var mod = N.MODULES.filter(function (m) { return m.id === etat.module; })[0];
-    var p = N.palier(etat.difficulte, etat.niveau);
-    doc.getElementById('titre-apercu').textContent = 'Module ' + mod.id + ' – ' + mod.titre + ' · niveau ' + etat.niveau + ' · difficulté ' + etat.difficulte;
+    var p = etat.difficulte;
+    doc.getElementById('titre-apercu').textContent = 'Module ' + mod.id + ' – ' + mod.titre + ' · niveau ' + etat.niveau + ' · difficulté ' + etat.difficulte + ' (palier D' + N.palier(etat.difficulte, etat.niveau) + ')';
     var objectifs = N.objectifs.filter(function (o) { return o.module === etat.module && o.niveaux.indexOf(etat.niveau) >= 0; });
     var numero = 0;
     [9, 10, 11].forEach(function (annee) {
@@ -231,12 +245,14 @@
             el('span', { 'class': 'etiquette', texte: o.id }),
             o.theme ? el('span', { 'class': 'etiquette', texte: o.theme }) : null,
             el('span', { 'class': 'etiquette', texte: o.niveaux.length === 2 ? 'niveaux 1 et 2' : 'niveau ' + o.niveaux[0] + ' seulement' }),
-            plusLoin ? el('span', { 'class': 'etiquette etiquette-plus-loin', texte: 'Pour aller plus loin (non compté)' }) : null
-          ])
+            plusLoin ? el('span', { 'class': 'etiquette etiquette-plus-loin', texte: 'Pour aller plus loin (non compté)' }) : null,
+            el('span', { 'class': 'etiquette etiquette-plus-loin', texte: legendePalier(o).etiquette })
+          ]),
+          el('p', { 'class': 'regle-apercu', texte: legendePalier(o).texte })
         ]));
         var actifs = o.modeles.filter(function (m) { return estActif(o, m, etat.niveau, p); });
         // même repli que l'appli : sans modèle prévu, elle prend ceux qui n'ont pas de condition « si »
-        var replis = actifs.length ? [] : o.modeles.filter(function (m) { return !m.si; });
+        var replis = actifs.length ? [] : o.modeles.filter(function (m) { return !m.si && !m.palierMax; });
         o.modeles.forEach(function (m) {
           var repli = replis.indexOf(m) >= 0;
           if (actifs.indexOf(m) < 0 && !repli) {
@@ -248,8 +264,10 @@
             ]));
             return;
           }
-          numero++;
-          section.appendChild(carte(o, m, numero, repli));
+          // modèle propre au palier D5 : trois exemples, pour juger le calibrage
+          var exemples = m.palierMin === 5 && m.d5 && N.palier(etat.difficulte, etat.niveau) === 5 ? 3 : 1;
+          if (exemples > 1) section.appendChild(el('p', { 'class': 'regle-apercu', texte: 'Modèle propre au palier D5 : trois exemples.' }));
+          for (var x = 0; x < exemples; x++) { numero++; section.appendChild(carte(o, m, numero, repli)); }
         });
       });
       zone.appendChild(section);

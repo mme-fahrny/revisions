@@ -90,7 +90,7 @@
     var rep = demande === 'base' ? b : n;
     return O.saisie({
       type: 'directe',
-      enonce: '<p>Dans la puissance ' + m(pui(b, n)) + ', quel est ' + (demande === 'base' ? 'la base' : 'l\'exposant') + ' ?</p>',
+      enonce: '<p>Dans la puissance ' + m(pui(b, n)) + ', ' + (demande === 'base' ? 'quelle est la base' : 'quel est l\'exposant') + ' ?</p>',
       consigne: 'Écris un nombre.',
       indice: 'Dans aⁿ, a est la base et n l\'exposant (écrit en petit, en haut).',
       reponse: { type: 'valeur', valeur: fr(rep), forme: 'entier' },
@@ -779,7 +779,7 @@
     { q: 'la distance Terre–Soleil (environ 150 millions de km)', e: 11, u: 'm' },
     { q: 'la longueur de la Suisse d\'est en ouest (environ 350 km)', e: 5, u: 'm' },
     { q: 'la capacité d\'un téléphone de 128 Go', e: 11, u: 'octets' },
-    { q: 'la population de la Suisse (environ 9 millions d\'habitants)', e: 6, u: 'habitants' },
+    { q: 'la population de la Suisse (environ 9 millions d\'habitants)', e: 7, u: 'habitants' },
     { q: 'la vitesse de la lumière (environ 300\'000 km/s)', e: 8, u: 'm/s' }
   ];
 
@@ -1147,12 +1147,12 @@
   function problemeSci(alea, p) {
     var modele = alea.choix(['lumiere', 'serveur', 'globules']);
     if (modele === 'lumiere') {
-      var d = alea.choix([[M.Fraction.depuis('1,5'), 8, 'le Soleil'], [M.Fraction.depuis('3,84'), 5, 'la Lune']]);
+      var d = alea.choix([[M.Fraction.depuis('1,5'), 8, 'le Soleil', 'du Soleil'], [M.Fraction.depuis('3,84'), 5, 'la Lune', 'de la Lune']]);
       var dist = d[0].fois(fr(10).puissance(d[1]));
       var t = dist.divise(fr(3).fois(fr(10).puissance(5)));
       return O.saisie({
         type: 'probleme',
-        enonce: '<p>La lumière parcourt environ ' + H.sciME(fr(3), 5) + ' km par seconde. La distance entre la Terre et ' + d[2] + ' est d\'environ ' + H.sciME(d[0], d[1]) + ' km.</p><p>Combien de secondes la lumière met-elle pour venir de ' + d[2] + ' jusqu\'à la Terre ?</p>',
+        enonce: '<p>La lumière parcourt environ ' + H.sciME(fr(3), 5) + ' km par seconde. La distance entre la Terre et ' + d[2] + ' est d\'environ ' + H.sciME(d[0], d[1]) + ' km.</p><p>Combien de secondes la lumière met-elle pour venir ' + d[3] + ' jusqu\'à la Terre ?</p>',
         consigne: 'Écris un nombre (ou un nombre multiplié par une puissance de 10).',
         clavier: 'complet',
         suffixe: 's',

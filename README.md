@@ -154,6 +154,33 @@ Détails typographiques produits par les fonctions :
 puissances dans l'édition 2024 de l'aide-mémoire (ces fonctions suivent les
 exemples `(2 ; – 3)` et `(– 3)` fournis).
 
+## Difficulté : cinq paliers internes (appli « Nombres et opérations »)
+
+Le curseur de l'élève est gradué de 1 à 4. En interne, chaque objectif est calibré sur
+**cinq paliers, D1 à D5** (`Nombres.palier(difficulte, niveau)` dans `nombres/js/catalogue.js`) :
+
+| Curseur | Niveau 1 | Niveau 2 |
+|---|---|---|
+| 1 | D1 | D2 |
+| 2 | D2 | D3 |
+| 3 | D3 | D4 |
+| 4 | D4 | D5 |
+
+- **D1** est réservé au niveau 1 (la base), **D5** au niveau 2. D2 à D4 sont communs.
+- D5 reprend les types d'exercices de la colonne « Activités pour le niveau 2 » des fichiers
+  d'objectifs : calculs à trou, écritures mêlées, notions combinées, problèmes moins guidés.
+  Les types sont repris, jamais les nombres du manuel (le site est public).
+- Ce qui est écrit en vert dans les fichiers d'objectifs (niveau 2 seulement) n'apparaît jamais
+  au niveau 1 ; au niveau 2, il est présent à tous ses paliers.
+- Un modèle de question déclare ses paliers avec `palierMin` et `palierMax`. Un modèle écrit
+  pour D5 porte `d5: true` ; les générateurs plus anciens, écrits pour quatre crans, reçoivent 4
+  au palier D5.
+- Un objectif réservé au niveau 2 (`niveaux: [2]`) garde ses quatre crans tels quels.
+- Les modules déjà recalibrés sont listés dans `MODULES_5_PALIERS` (`catalogue.js`). Les autres
+  gardent provisoirement l'ancienne règle (même difficulté aux deux niveaux).
+- La page `nombres/apercu.html` (aperçu pour l'enseignante, non liée depuis l'accueil) affiche
+  le palier de chaque objectif pour le niveau et le curseur choisis.
+
 ## Pour les développeurs : API des fichiers `assets/`
 
 ### `profil.js` (objet global `Profil`)

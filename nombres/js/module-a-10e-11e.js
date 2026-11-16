@@ -447,7 +447,7 @@
               (!opts.relatifs && valeursIntermediaires(t).some(function (x) { return x.signe() < 0; })) ||
               (opts.style === 'decimal' && !valeursIntermediaires(t).every(function (x) { return x.estDecimale() && O.nbDecimales(x) <= 3; }))) && essais < 400);
     var naif = A.naif(t);
-    var irr = opts.irreductible || (p >= 3 && alea.suivant() < 0.5);
+    var irr = opts.irreductible || (opts.style !== 'decimal' && p >= 3 && alea.suivant() < 0.5);
     var et = A.etapes(t).map(function (e, i) { return [e[0], m((i === 0 ? A.html(t) + ' ' : '') + e[1])]; });
     return O.saisie({
       type: 'directe',
@@ -870,7 +870,7 @@
   function problemeRabais(alea, p) {
     var prix = alea.choix([40, 60, 80, 120, 160, 200, 240, 280, 300].filter(function (x) { return x <= Math.max(40, A9.LIMITE[p]); }));
     var pc = alea.choix(p <= 2 ? [10, 20, 25, 50] : [15, 30, 35, 40, 12, 5]);
-    var objet = alea.choix([{ un: 'un vélo', du: 'du vélo' }, { un: 'une paire de skis', du: 'de la paire de skis' }, { un: 'un casque de vélo', du: 'du casque de vélo' }, { un: 'une tente de camping', du: 'de la tente de camping' }, { un: 'une trottinette', du: 'de la trottinette' }]);
+    var objet = alea.choix([{ un: 'un sac à dos', du: 'du sac à dos' }, { un: 'une paire de baskets', du: 'de la paire de baskets' }, { un: 'un casque de vélo', du: 'du casque de vélo' }, { un: 'une tente de camping', du: 'de la tente de camping' }, { un: 'une trottinette', du: 'de la trottinette' }]);
     var hausse = p >= 3 && alea.suivant() < 0.3;
     var red = fr(prix * pc, 100);
     var res = hausse ? fr(prix).plus(red) : fr(prix).moins(red);
@@ -895,14 +895,14 @@
   }
 
   function problemeEnergie(alea, p) {
-    // consommation mensuelle (ordre de grandeur réaliste pour un ménage), nombres ⩽ la limite
+    // consommation journalière d'un bâtiment scolaire (ordre de grandeur réaliste), nombres ⩽ la limite
     var conso = alea.choix([20, 40, 60, 80, 120, 160, 200, 240, 300].filter(function (x) { return x <= Math.max(20, A9.LIMITE[p]); }));
     var pc, res, essai = 0;
     do { pc = alea.choix([10, 20, 25, 30, 40, 50, 60, 75]); res = fr(conso * pc, 100); essai++; } while (!res.estEntier() && essai < 50);
     var inutile = p >= 3 ? ' Les panneaux ont une surface de ' + alea.entier(15, 40) + ' m².' : '';
     return O.saisie({
       type: 'probleme',
-      enonce: '<p>Une famille consomme ' + H.n(fr(conso)) + ' kWh d\'électricité par mois. Ses panneaux solaires couvrent ' + pc + ' % de cette consommation.' + inutile + '</p><p>Combien de kWh les panneaux fournissent-ils par mois ?</p>',
+      enonce: '<p>Un collège consomme ' + H.n(fr(conso)) + ' kWh d\'électricité par jour. Ses panneaux solaires couvrent ' + pc + ' % de cette consommation.' + inutile + '</p><p>Combien de kWh les panneaux fournissent-ils par jour ?</p>',
       consigne: 'Réponse en kWh.',
       suffixe: 'kWh',
       indice: pc + ' % de ' + conso + ' = ' + pc + '/100 · ' + conso + '.',
@@ -1775,7 +1775,7 @@
       titre: 'Les quatre opérations avec des nombres rationnels (fraction irréductible)',
       modeles: [
         // D1 : deux fractions (négatives possibles) ; D2 : produits et quotients ; D3-D4 : trois opérations
-        { type: 'directe', palierMax: 4, gen: function (a, p) { return A9.questionAddSous(a, Math.min(p, 3), { relatifs: true }); } },
+        { type: 'directe', palierMax: 4, gen: function (a, p) { return A9.questionAddSous(a, Math.min(p, 3), { relatifs: true, irreductible: p >= 2 }); } },
         { type: 'directe', palierMin: 2, gen: function (a, p, c) { return questionMulDiv(a, p, c, { relatifs: true }); } },
         { type: 'directe', palierMin: 3, gen: function (a, p, c) { return questionPriorites(a, p, c, { irreductible: true, relatifs: true }); } },
         { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurPriorites(a, p); } },

@@ -154,7 +154,8 @@
     }
     var corr = corrigerSomme(termes, expr);
     var res = expr.v;
-    var irreductible = p >= 2 && alea.suivant() < 0.6;
+    if (res.estZero()) return questionAddSous(alea, p, opts);   // « 1/2 – 1/2 » n'apprend rien
+    var irreductible = opts.irreductible || (p >= 2 && alea.suivant() < 0.6);
     var pieges = [];
     if (termes.length === 2) {
       var A = Number(termes[0].f.num), B = Number(termes[0].f.den), C = Number(termes[1].f.num), D = Number(termes[1].f.den);
@@ -1509,7 +1510,7 @@
     var partie = f.fois(n);
     var reste = p >= 3;
     var res = reste ? fr(n).moins(partie) : partie;
-    var donneeInutile = p >= 3 ? ' (La dernière fois, il y a ' + alea.entier(2, 9) + ' jours, c\'était différent.)' : '';
+    var donneeInutile = p >= 3 ? ' (Ce relevé a été noté le ' + alea.entier(2, 28) + ' du mois.)' : '';
     var autreLieu = alea.choix(['Neuchâtel', 'Yverdon-les-Bains', 'Bienne']);
     return O.saisie({
       type: 'probleme',

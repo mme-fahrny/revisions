@@ -155,9 +155,11 @@
     var texteDiff = el('p', { id: 'difficulte-texte', 'class': 'difficulte-texte' });
     function majDiff() {
       var d = Number(curseur.value);
+      // Palier interne D1 à D5 : le curseur vaut D1 à D4 au niveau 1 et D2 à D5 au niveau 2.
+      // (Modules pas encore recalibrés : le texte suit le curseur, comme avant.)
+      var D = N.palierObjectif({ module: etat.module, niveaux: [1, 2] }, N.palier(d, profil.niveau), { curseur: d });
       texteDiff.textContent = 'Difficulté ' + d + ' sur 4 : ' + NIVEAUX_DIFFICULTE[d] + '. ' +
-        ['', 'Exercices de base : petits nombres, une seule opération.', 'Deux étapes, nombres jusqu\'à 100.', 'Deux à trois étapes, ppmc ou pgdc à trouver.', 'Le plus exigeant du niveau : trois étapes au plus, problèmes en contexte.'][d] +
-        (profil.niveau === 2 ? ' (Au niveau 2, certaines questions vont plus loin, surtout en difficulté 4.)' : '');
+        ['', 'Exercices de base : petits nombres, une seule opération.', 'Deux étapes, nombres jusqu\'à 100.', 'Deux à trois étapes, ppmc ou pgdc à trouver.', 'Trois étapes au plus, nombres jusqu\'à 300, problèmes en contexte.', 'Le plus exigeant : calculs à trou, écritures mêlées, problèmes moins guidés.'][D];
     }
     curseur.addEventListener('input', majDiff);
     majDiff();
