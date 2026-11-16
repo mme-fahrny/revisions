@@ -514,6 +514,32 @@ modules.forEach(function (mod) {
   });
 });
 
+// Modèles écrits pour le palier D5 : tirages directs (dans une série, ils sortent trop rarement
+// pour être contrôlés sérieusement). Les modèles communs à plusieurs paliers sont testés à chacun.
+Nombres.objectifs.forEach(function (o) {
+  if ((seulement && o.module !== seulement) || process.argv[3]) return;
+  o.modeles.forEach(function (m, i) {
+    if (!m.d5) return;
+    for (var d = Math.max(2, m.palierMin || 1); d <= Math.min(5, m.palierMax || 5); d++) {
+      var ctx = { annee: o.annee, niveau: 2, palier: d, curseur: d - 1 };
+      for (var s = 0; s < 400; s++) {
+        var ident = o.id + ' modèle ' + i + ' D' + d + ' [graine ' + s + ']';
+        var q;
+        try { q = Nombres.creerQuestion(Object.assign(Object.create(o), { modeles: [m] }), new Maths.Alea('d5-' + o.id + i + d + s), d, ctx, {}, true); }
+        catch (e) { echec('génération impossible (D5) : ' + e.message, ident); continue; }
+        total++;
+        q.numero = 1;
+        controler(q, ident);
+        verifierReponses(q, ident);
+        verifierBornes(q, o, q.palierGen, ident);
+        verifierContenu(q, o, { annee: o.annee, niveau: 2 }, d - 1, ident);
+        verifierEcriture(q, ident);
+        verifierVisuels(q, ident);
+      }
+    }
+  });
+});
+
 // Chaque objectif a été exercé
 Nombres.objectifs.forEach(function (o) {
   if (seulement && o.module !== seulement) return;
