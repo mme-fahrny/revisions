@@ -1262,7 +1262,7 @@
         { type: 'directe', gen: function (a, p) { return A9.questionFractionPourcent(a, p, { periodique: true }); } },
         { type: 'directe', palierMin: 3, gen: function (a, p) { return questionIntrus(a, p); } },
         { type: 'vraifaux', palierMin: 2, gen: function (a, p) { return vraiFauxPeriodique(a, p); } },
-        { type: 'directe', si: function (c, p) { return c.niveau === 2 && p >= 4; }, gen: function (a, p) { return questionPeriodiquePlusFraction(a, p); } }
+        { type: 'directe', palierMin: 5, gen: function (a, p) { return questionPeriodiquePlusFraction(a, p); } }
       ]
     },
     {
@@ -1287,13 +1287,16 @@
       ]
     },
     {
-      id: 'A10-simplifier', module: 'A', annee: 10, niveaux: [1, 2], theme: 'NO 10.3',
+      id: 'A10-simplifier', module: 'A', annee: 10, niveaux: [1, 2], theme: 'NO 10.3', bornesD: A9.BORNES_SIMPLIFIER,
       titre: 'Simplifier, amplifier, fraction irréductible',
       modeles: [
-        { type: 'directe', gen: function (a, p) { return A9.questionSimplifier(a, p); } },
-        { type: 'directe', gen: function (a, p) { return A9.questionAmplifier(a, p); } },
-        { type: 'erreur', palierMin: 2, gen: function (a, p) { return A9.erreurSimplifier(a, p); } },
-        { type: 'vraifaux', palierMin: 2, gen: function (a, p) { return A9.vraiFauxIrreductible(a, p); } }
+        { type: 'directe', d5: true, gen: function (a, p) { return A9.questionSimplifier5(a, p); } },
+        { type: 'directe', palierMax: 3, gen: function (a, p) { return A9.questionAmplifier(a, p); } },
+        { type: 'erreur', palierMin: 2, palierMax: 4, gen: function (a, p) { return A9.erreurSimplifier(a, p); } },
+        { type: 'vraifaux', palierMin: 2, palierMax: 3, gen: function (a, p) { return A9.vraiFauxIrreductible(a, p); } },
+        { type: 'directe', palierMin: 3, d5: true, gen: function (a, p) { return A9.questionProduitASimplifier(a, p); } },
+        { type: 'directe', palierMin: 3, d5: true, gen: function (a, p) { return A9.questionSommeASimplifier(a, p); } },
+        { type: 'vraifaux', palierMin: 4, d5: true, gen: function (a, p) { return A9.vraiFauxSauvage(a, p); } }
       ]
     },
     {
@@ -1368,7 +1371,7 @@
         { type: 'directe', palierMin: 3, gen: function (a, p, c) { return questionPriorites(a, p, c, { irreductible: true, relatifs: true }); } },
         { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurPriorites(a, p); } },
         { type: 'vraifaux', palierMin: 2, gen: function (a, p) { return vraiFauxMulDiv(a, p); } },
-        { type: 'directe', si: function (c, p) { return c.niveau === 2 && p >= 4; }, gen: function (a, p) { return questionFractionImbriquee(a, p); } }
+        { type: 'directe', palierMin: 5, gen: function (a, p) { return questionFractionImbriquee(a, p); } }
       ]
     },
     {
@@ -1379,7 +1382,7 @@
         { type: 'directe', gen: function (a, p) { return questionIrrationnel(a, p); } },
         { type: 'directe', palierMin: 2, gen: function (a, p) { return questionOrdonnerReels(a, p); } },
         { type: 'directe', palierMin: 3, gen: function (a, p) { return questionEncadrerRacine(a, p); } },
-        { type: 'directe', si: function (c, p) { return c.niveau === 2 && p >= 4; }, gen: function (a, p) { return questionIntercalerReels(a, p); } }
+        { type: 'directe', palierMin: 5, gen: function (a, p) { return questionIntercalerReels(a, p); } }
       ]
     },
     {

@@ -5,10 +5,12 @@
  *
  *   Nombres.MODULES                         A, B, C (titre, description)
  *   Nombres.objectifs                        tous les objectifs
- *   Nombres.palier(difficulte, niveau)       difficulté appliquée (1 à 4) : la même aux deux
- *                                            niveaux ; le niveau 2 a du contenu en plus
- *                                            (ctx.niveau dans les générateurs), jamais des
- *                                            nombres plus grands.
+ *   Nombres.palier(difficulte, niveau)       palier interne D1 à D5. Le curseur de l'élève va
+ *                                            de 1 à 4 : au niveau 1 il donne D1 à D4, au niveau 2
+ *                                            D2 à D5 (curseur + 1). D1 est donc réservé au
+ *                                            niveau 1 et D5 au niveau 2.
+ *   Nombres.palierObjectif(o, D, ctx)        palier vu par un objectif (voir plus bas)
+ *   Nombres.modeleActif(o, m, ctx)           le modèle m est-il proposé à ce palier ?
  *   Nombres.objectifsPour(module, profil)    objectifs disponibles, avec leur statut :
  *        'courant'  : objectif de l'année de l'élève
  *        'revision' : objectif d'une année précédente
@@ -55,8 +57,44 @@
     visuel: 'Représentation'
   };
 
-  function palier(difficulte) {
-    return Math.max(1, Math.min(4, Number(difficulte) || 1));
+  function curseur(difficulte) { return Math.max(1, Math.min(4, Number(difficulte) || 1)); }
+
+  /** Palier interne D1 à D5 : curseur au niveau 1, curseur + 1 au niveau 2. */
+  function palier(difficulte, niveau) {
+    return curseur(difficulte) + (Number(niveau) === 2 ? 1 : 0);
+  }
+
+  /*
+   * Modules déjà calibrés sur 5 paliers. Les autres gardent provisoirement l'ancienne règle
+   * (même difficulté aux deux niveaux) jusqu'à leur recalibrage.
+   */
+  var MODULES_5_PALIERS = { A: true };
+
+  /**
+   * Palier vu par un objectif.
+   * - Objectif réservé au niveau 2 : ses quatre crans existants sont conservés tels quels
+   *   (ils valent D2 à D5) ; ses générateurs reçoivent donc toujours le curseur (1 à 4).
+   * - Module pas encore recalibré : curseur (1 à 4).
+   * - Sinon : palier interne D1 à D5.
+   */
+  function palierObjectif(o, D, ctx) {
+    var c = ctx && ctx.curseur ? ctx.curseur : Math.min(4, D);
+    if (o.niveaux.length === 1 && o.niveaux[0] === 2) return c;
+    if (!MODULES_5_PALIERS[o.module]) return c;
+    return D;
+  }
+
+  /** modele.palierMin / palierMax / si(ctx, p) : modèle réservé à certains paliers ou à un niveau. */
+  function modeleActif(o, m, ctx) {
+    var p = palierObjectif(o, ctx.palier, ctx);
+    return (!m.palierMin || p >= m.palierMin) && (!m.palierMax || p <= m.palierMax) && (!m.si || !!m.si(ctx, p));
+  }
+
+  /** Palier transmis au générateur : les générateurs écrits pour 4 crans reçoivent 4 au palier D5
+   *  (le palier D5 est alors porté par les modèles marqués « d5 », écrits pour lui). */
+  function palierGenerateur(o, m, ctx) {
+    var p = palierObjectif(o, ctx.palier, ctx);
+    return m.d5 ? p : Math.min(4, p);
   }
 
   /*
@@ -102,9 +140,10 @@
 
   /** Une question d'un objectif. typesUtilises : compteur pour varier les types. */
   function creerQuestion(o, alea, p, ctx, typesUtilises, strict) {
-    // modele.si(ctx, p) : modèle réservé à certaines difficultés ou à un niveau
-    var modeles = o.modeles.filter(function (m) { return (!m.palierMin || p >= m.palierMin) && (!m.si || m.si(ctx, p)); });
-    if (!modeles.length) modeles = o.modeles.filter(function (m) { return !m.si; });
+    ctx = ctx || {};
+    if (!ctx.palier) ctx.palier = p;
+    var modeles = o.modeles.filter(function (m) { return modeleActif(o, m, ctx); });
+    if (!modeles.length) modeles = o.modeles.filter(function (m) { return !m.si && !m.palierMax; });
     typesUtilises = typesUtilises || {};
     // on préfère les types les moins utilisés dans la série
     var min = Infinity;
@@ -114,7 +153,7 @@
     var q, essais = 0;
     for (;;) {
       try {
-        q = modele.gen(alea, p, ctx);
+        q = modele.gen(alea, palierGenerateur(o, modele, ctx), ctx);
         if (estInterdite(q)) { essais++; if (essais > 30) throw new Error('Exemple de référence impossible à éviter'); continue; }
         break;
       } catch (e) {
@@ -126,7 +165,9 @@
     q.objectif = o.id;
     q.objectifTitre = o.titre;
     q.module = o.module;
-    q.palier = p;
+    q.palier = p;                                   // palier interne D1 à D5
+    q.curseur = ctx.curseur || Math.min(4, p);      // cran choisi par l'élève (1 à 4)
+    q.palierGen = palierGenerateur(o, modele, ctx); // palier réellement appliqué par le générateur
     q.type = q.type || modele.type;
     q.typeTexte = TYPES[q.type] || '';
     typesUtilises[modele.type] = (typesUtilises[modele.type] || 0) + 1;
@@ -151,7 +192,7 @@
     while (ordre.length < n) ordre = ordre.concat(alea.melanger(choisis));
     ordre = ordre.slice(0, n);
     var typesUtilises = {};
-    var ctx = { annee: profil.annee, niveau: profil.niveau, palier: p };
+    var ctx = { annee: profil.annee, niveau: profil.niveau, palier: p, curseur: curseur(options.difficulte) };
     return ordre.map(function (d, i) {
       var q = creerQuestion(d.objectif, alea, p, ctx, typesUtilises, options.strict);
       q.statut = d.statut;
@@ -167,6 +208,10 @@
     objectifs: objectifs,
     parId: parId,
     palier: palier,
+    curseur: curseur,
+    palierObjectif: palierObjectif,
+    modeleActif: modeleActif,
+    palierGenerateur: palierGenerateur,
     estInterdite: estInterdite,
     objectifsPour: objectifsPour,
     selectionParDefaut: selectionParDefaut,

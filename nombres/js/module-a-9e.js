@@ -761,6 +761,341 @@
   }
 
   /* =====================================================================
+   * CALIBRAGE EN 5 PALIERS — objectif « simplifier » (9e et 10e), validé par l'enseignante
+   * ---------------------------------------------------------------------
+   * Calibrage calqué sur les exercices du cours (types repris, nombres jamais recopiés) :
+   *   D1-D2 : 9e F183 « Irréductible ! »          D3 : 9e F184 « Vers l'irréductible »
+   *   D3-D4 : 10e F104 « Réductions possibles ? » (fondamentum du niveau 1)
+   *   D4-D5 : 10e F105 « Simplifications sauvages » (approfondissement)
+   *   D5    : 10e F106 « Toujours plus simple » (absent du fil rouge du niveau 1)
+   * ===================================================================== */
+
+  var S5 = [null,
+    { limite: 50, maxDen: 6, facteurs: [2, 3, 5, 10] },
+    { limite: 100, maxDen: 10, facteurs: [2, 3, 4, 5, 6, 7, 8, 9] },
+    { limite: 200, maxDen: 12, facteurs: [6, 8, 9, 12, 14, 15, 16, 18] },
+    { limite: 300, maxDen: 12, facteurs: [13, 17, 19, 21, 23, 24, 26] },
+    { limite: 500, maxDen: 15, facteurs: [28, 34, 36, 38, 39, 42, 46, 51, 52, 57] }
+  ];
+
+  function estPremier(n) {
+    if (n < 2) return false;
+    for (var t = 2; t * t <= n; t++) if (n % t === 0) return false;
+    return true;
+  }
+  function plusGrandFacteurPremier(n) {
+    var g = 1;
+    for (var t = 2; n > 1; t++) while (n % t === 0) { n /= t; g = t; }
+    return g;
+  }
+  /** « 2² · 3² · 7 » */
+  function decomposition(n) {
+    var parts = [], t = 2;
+    while (n > 1) {
+      var e = 0;
+      while (n % t === 0) { n /= t; e++; }
+      if (e) parts.push(t + (e > 1 ? M.texteExposant(e) : ''));
+      t++;
+    }
+    return parts.join(NB + '·' + NB);
+  }
+  function produitHtml(facteurs) { return facteurs.join(NB + '·' + NB); }
+  function produitTexte(facteurs) { return facteurs.join('*'); }
+  function produitDe(facteurs) { return facteurs.reduce(function (x, y) { return x * y; }, 1); }
+  function distincts(alea, liste, n) { return alea.melanger(liste).slice(0, n); }
+
+  /** Fraction à simplifier au palier d (1 à 5). */
+  function fractionASimplifier5(alea, d) {
+    var s = S5[d];
+    // D2 et plus : parfois une fraction déjà irréductible qui « a l'air » simplifiable (9e F183, F184)
+    if (d >= 2 && alea.suivant() < 0.12) {
+      for (var e = 0; e < 300; e++) {
+        // D2 : petits nombres des livrets (35/64, 27/20) ; ensuite jusqu'à 130 (56/65, 105/64)
+        var x = alea.entier(8, d === 2 ? 64 : 130), y = alea.entier(8, d === 2 ? 64 : 130);
+        if (d === 2 && (plusGrandFacteurPremier(x) > 7 || plusGrandFacteurPremier(y) > 7)) continue;
+        if (x !== y && !estPremier(x) && !estPremier(y) && O.pgcd(x, y) === 1) return { ab: [x, y], k: 1, a: x, b: y };
+      }
+    }
+    // D2 : parfois un résultat entier (27/9)
+    if (d === 2 && alea.suivant() < 0.1) {
+      var n = alea.entier(2, 6), q = alea.entier(3, 12);
+      return { ab: [n, 1], k: q, a: n * q, b: q };
+    }
+    for (var essai = 0; essai < 400; essai++) {
+      var b0 = alea.entier(2, s.maxDen);
+      var a0 = alea.entier(1, d === 1 ? b0 - 1 : 2 * b0);
+      if (O.pgcd(a0, b0) !== 1 || a0 === b0) continue;
+      var k = alea.choix(s.facteurs);
+      if (a0 * k <= s.limite && b0 * k <= s.limite) return { ab: [a0, b0], k: k, a: a0 * k, b: b0 * k };
+    }
+    return { ab: [1, 2], k: s.facteurs[0], a: s.facteurs[0], b: 2 * s.facteurs[0] };
+  }
+
+  function questionSimplifier5(alea, d) {
+    var s = fractionASimplifier5(alea, d);
+    var a = s.a, b = s.b, k = s.k;
+    var f = fr(a, b), g = O.pgcd(a, b);
+    var pieges = g === 1 ? [] : [
+      { valeur: fr(a / g, b), message: 'Tu as simplifié seulement le numérateur. Pour simplifier, on divise le numérateur ET le dénominateur par le même nombre.' },
+      { valeur: fr(a, b / g), message: 'Tu as simplifié seulement le dénominateur. Pour simplifier, on divise le numérateur ET le dénominateur par le même nombre.' }
+    ].filter(function (pg) { return !pg.valeur.egal(f); });
+    var indice = d === 1 ? 'Divise le numérateur et le dénominateur par ' + k + '.'
+      : d === 2 ? 'Cherche dans tes livrets un nombre qui divise à la fois ' + a + ' et ' + b + '.'
+      : d === 3 ? 'Tu peux simplifier en plusieurs fois (par 2, par 3…) ou chercher directement le pgdc de ' + a + ' et ' + b + '.'
+      : 'Décompose ' + a + ' et ' + b + ' en produits de facteurs premiers pour trouver leur pgdc.';
+    var et = etapesSimplifier(a, b);
+    if (d >= 4 && g > 1) {
+      et = [['Je décompose le numérateur et le dénominateur en produits de facteurs premiers.',
+        m(a + ' = ' + decomposition(a)) + ' et ' + m(b + ' = ' + decomposition(b))]].concat(et);
+    }
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Simplifie' + (d >= 2 ? ', si c\'est possible,' : '') + ' la fraction ' + m(H.fh(a, b)) + '.</p>',
+      consigne: 'Donne la <strong>fraction irréductible</strong> : on ne doit plus pouvoir la simplifier.',
+      indice: indice,
+      reponse: { type: 'valeur', valeur: f, forme: 'irreductible' },
+      pieges: pieges,
+      etapes: O.etapes(et),
+      verification: g === 1 ? 'Vérification : ' + m(a + ' = ' + decomposition(a)) + ' et ' + m(b + ' = ' + decomposition(b)) + ' n\'ont aucun facteur premier commun. ✓'
+        : 'Vérification : ' + m(H.f(f)) + ' est irréductible, et ' + m(O.num(f) + ' · ' + g + ' = ' + a) + ', ' + m(O.den(f) + ' · ' + g + ' = ' + b) + '. ✓',
+      rubrique: R.amplifier,
+      nombres: [fr(a), fr(b)],
+      controle: { expr: a + '/' + b },
+      attenduHtml: H.f(f)
+    });
+  }
+
+  /** 10e — quotient de deux produits à simplifier sans calculer les produits (F104 e, g, h ; F106 c, f, h). */
+  function questionProduitASimplifier(alea, d) {
+    var x, y, k, haut, bas, decHaut, decBas, communs;
+    do { x = alea.entier(1, 9); y = alea.entier(1, 9); } while (x === y || O.pgcd(x, y) !== 1);
+    function f1(v) { return v === 1 ? [] : [v]; }
+    if (d <= 3) {
+      k = distincts(alea, [2, 3, 5, 7], 2);
+      haut = [k[0], k[1]].concat(f1(x)); bas = [k[1], k[0]].concat(f1(y));
+      decHaut = haut.slice(); decBas = bas.slice(); communs = k;
+      haut = alea.melanger(haut); bas = alea.melanger(bas);
+    } else if (d === 4) {
+      // deux facteurs en haut et en bas, tous ⩽ 100 (10e F104 g, h)
+      do {
+        k = distincts(alea, [2, 3, 5, 7, 10, 13, 17], 3);
+        haut = [k[0] * k[1], k[2] * x]; bas = [k[0] * k[2], k[1] * y];
+      } while (Math.max(haut[0], haut[1], bas[0], bas[1]) > 100 || haut[0] === bas[0] || haut[1] === bas[1]);
+      decHaut = [k[0] + NB + '·' + NB + k[1], x === 1 ? String(k[2]) : k[2] + NB + '·' + NB + x];
+      decBas = [k[0] + NB + '·' + NB + k[2], y === 1 ? String(k[1]) : k[1] + NB + '·' + NB + y];
+      communs = k;
+    } else {
+      // trois facteurs en haut et en bas, dont un grand facteur premier visible des deux côtés (10e F106 c, f, h)
+      var K = alea.choix([17, 19, 23, 29, 31, 37, 41, 43, 47]);
+      do { x = alea.entier(2, 9); y = alea.entier(2, 9); } while (x === y || O.pgcd(x, y) !== 1);
+      do {
+        k = distincts(alea, [2, 3, 4, 5, 6, 7, 8, 9, 11, 12], 3);
+        haut = [k[0] * k[1], K, k[2] * x]; bas = [K, k[0] * y, k[1] * k[2]];
+      } while (Math.max(haut[0], haut[2], bas[1], bas[2]) > 110);
+      decHaut = [k[0] + NB + '·' + NB + k[1], String(K), k[2] + NB + '·' + NB + x];
+      decBas = [String(K), k[0] + NB + '·' + NB + y, k[1] + NB + '·' + NB + k[2]];
+      communs = k.concat([K]);
+    }
+    var P = produitDe(haut), Q = produitDe(bas), f = fr(P, Q);
+    var listeCommuns = communs.slice().sort(function (u, v) { return u - v; });
+    var texteCommuns = listeCommuns.length > 1 ? listeCommuns.slice(0, -1).join(', ') + ' et ' + listeCommuns[listeCommuns.length - 1] : String(listeCommuns[0]);
+    var pieges = [];
+    if (x === 1) pieges.push({ valeur: fr(0), message: 'Quand tous les facteurs du numérateur sont simplifiés, il reste 1 (et non 0) : simplifier, c\'est diviser.' });
+    pieges.push({ valeur: fr(Q, P), message: 'Tu as inversé le numérateur et le dénominateur.' });
+    var et = [];
+    if (d >= 4) et.push(['Je décompose les facteurs pour faire apparaître les facteurs communs.', m(H.fh(produitHtml(haut), produitHtml(bas)) + ' = ' + H.fh(produitHtml(decHaut), produitHtml(decBas)))]);
+    et.push(['Le numérateur et le dénominateur sont des produits : je simplifie par les facteurs communs ' + texteCommuns + '.',
+      m(H.fh(produitHtml(d >= 4 ? decHaut : haut), produitHtml(d >= 4 ? decBas : bas)) + ' = ' + H.fh(x, y) + (y === 1 ? ' = ' + x : ''))]);
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Trouve la fraction irréductible égale à cette expression, <strong>sans calculer les produits</strong> :</p><p class="calcul">' + m(H.fh(produitHtml(haut), produitHtml(bas))) + '</p>',
+      consigne: 'Donne la <strong>fraction irréductible</strong> (ou l\'entier).',
+      indice: d <= 3 ? 'Repère les facteurs écrits à la fois en haut et en bas.' : 'Écris chaque facteur comme un produit (par exemple ' + haut[0] + ' = ' + decomposition(haut[0]) + ') pour repérer les facteurs communs.',
+      reponse: { type: 'valeur', valeur: f, forme: 'irreductible' },
+      pieges: pieges.filter(function (pg) { return !pg.valeur.egal(f); }),
+      etapes: O.etapes(et),
+      verification: 'Vérification : ' + m(produitHtml(haut) + ' = ' + M.formaterNombre(P)) + ' et ' + m(produitHtml(bas) + ' = ' + M.formaterNombre(Q)) + ' ; en divisant les deux par ' + M.formaterNombre(O.pgcd(P, Q)) + ', on retrouve ' + m(H.f(f)) + '. ✓',
+      rubrique: R.amplifier,
+      nombres: haut.concat(bas).map(function (v) { return fr(v); }),
+      controle: { expr: '(' + produitTexte(haut) + ')/(' + produitTexte(bas) + ')' },
+      attenduHtml: H.f(f)
+    });
+  }
+
+  var MESSAGE_TERME = 'Tu as supprimé un <strong>terme</strong> en haut et en bas. On ne simplifie que par un <strong>facteur</strong> commun : ici, calcule d\'abord les sommes (ou mets en évidence).';
+
+  /** 10e — expression contenant une somme ou une différence (F104 c, d, f ; Faire le point p. 45 ; F106 a, b, d, e). */
+  function questionSommeASimplifier(alea, d) {
+    var PLUS = ' + ', MOINS = ' – ';
+    var type = d <= 3 ? alea.choix(['aPlusAb', 'troisTermes']) : d === 4 ? alea.choix(['aSurSomme', 'kbPlusK']) : alea.choix(['evidence', 'difference', 'consecutifs', 'opposes']);
+    var haut, bas, f, et, pieges = [], expr, indice, a, b, c, k, q, n;
+    if (type === 'aPlusAb') {
+      a = alea.entier(2, 9); b = alea.entier(1, 5);
+      haut = b === 1 ? a + PLUS + a : a + PLUS + a + NB + '·' + NB + b; bas = String(a);
+      f = fr(a + a * b, a); expr = '(' + a + '+' + a + '*' + b + ')/' + a;
+      pieges.push({ valeur: fr(a * b), message: MESSAGE_TERME });
+      pieges.push({ valeur: fr(1 + a * b), message: 'Il faut diviser <strong>chaque</strong> terme du numérateur par ' + a + ', pas seulement le premier.' });
+      et = [['Je calcule d\'abord le numérateur (la multiplication avant l\'addition).', m(H.fh(haut, bas) + ' = ' + H.fh(a + a * b, a))],
+        ['Je simplifie par ' + a + '.', m(H.fh(a + a * b, a) + ' = ' + (1 + b))]];
+      indice = 'Le numérateur est une somme : calcule-la avant de simplifier.';
+    } else if (type === 'troisTermes') {
+      do { a = alea.entier(2, 9); b = alea.entier(2, 9); c = alea.entier(2, 9); } while (a === c || fr(a + b + c, a + c).egal(fr(b)) || (a + b + c) % (a + c) === 0);
+      haut = a + PLUS + b + PLUS + c; bas = a + PLUS + c;
+      f = fr(a + b + c, a + c); expr = '(' + a + '+' + b + '+' + c + ')/(' + a + '+' + c + ')';
+      pieges.push({ valeur: fr(b), message: MESSAGE_TERME });
+      et = [['Le numérateur et le dénominateur sont des sommes : je les calcule d\'abord.', m(H.fh(haut, bas) + ' = ' + H.fh(a + b + c, a + c))],
+        [O.pgcd(a + b + c, a + c) > 1 ? 'Je simplifie par ' + O.pgcd(a + b + c, a + c) + '.' : 'La fraction obtenue est déjà irréductible.', m(H.fh(a + b + c, a + c) + ' = ' + H.f(f))]];
+      indice = 'Calcule la somme du haut et la somme du bas avant de chercher à simplifier.';
+    } else if (type === 'aSurSomme') {
+      a = alea.choix([11, 12, 13, 14, 15, 16, 17, 18, 19]); n = alea.entier(2, 5);
+      haut = String(a); bas = a + PLUS + (n * a);
+      f = fr(1, n + 1); expr = a + '/(' + a + '+' + (n * a) + ')';
+      pieges.push({ valeur: fr(1, n * a), message: MESSAGE_TERME });
+      pieges.push({ valeur: fr(1, n), message: 'Vérifie le dénominateur : ' + a + ' + ' + (n * a) + ' = ' + ((n + 1) * a) + ', c\'est ' + (n + 1) + ' fois ' + a + '.' });
+      et = [['Je calcule d\'abord la somme du dénominateur.', m(H.fh(haut, bas) + ' = ' + H.fh(a, (n + 1) * a))],
+        ['Je simplifie par ' + a + ' : ' + ((n + 1) * a) + ' = ' + (n + 1) + ' · ' + a + '.', m(H.fh(a, (n + 1) * a) + ' = ' + H.f(f))]];
+      indice = 'Calcule d\'abord le dénominateur. Combien de fois contient-il ' + a + ' ?';
+    } else if (type === 'kbPlusK') {
+      do { k = alea.choix([6, 8, 10, 12, 15, 20, 25]); b = alea.entier(2, 6); q = alea.entier(2, 12); } while (O.pgcd(b + 1, q) !== 1 || q === 1 || k * q > 300);
+      haut = k + NB + '·' + NB + b + PLUS + k; bas = String(k * q);
+      f = fr(b + 1, q); expr = '(' + k + '*' + b + '+' + k + ')/' + (k * q);
+      pieges.push({ valeur: fr(k * b, q), message: 'Dans le numérateur, ' + k + ' · ' + b + ' + ' + k + ' vaut ' + (b + 1) + ' fois ' + k + ' : en simplifiant par ' + k + ', le dernier terme devient 1, il ne disparaît pas.' });
+      et = [['Je calcule le numérateur (la multiplication avant l\'addition).', m(H.fh(haut, bas) + ' = ' + H.fh(k * (b + 1), k * q))],
+        ['Je simplifie par ' + O.pgcd(k * (b + 1), k * q) + '.', m(H.fh(k * (b + 1), k * q) + ' = ' + H.f(f))]];
+      indice = 'Calcule d\'abord le numérateur, puis cherche le pgdc.';
+    } else if (type === 'evidence') {
+      do { k = alea.choix([17, 19, 23, 29, 31, 37, 41, 43]); b = alea.entier(2, 7); q = alea.entier(2, 9); } while (O.pgcd(b + 1, q) !== 1 && (b + 1) % q !== 0 || q === b + 1);
+      haut = k + NB + '·' + NB + b + PLUS + k; bas = String(k * q);
+      f = fr(b + 1, q); expr = '(' + k + '*' + b + '+' + k + ')/' + (k * q);
+      pieges.push({ valeur: fr(b, q), message: 'En mettant ' + k + ' en évidence, le dernier terme devient 1 : ' + k + ' · ' + b + ' + ' + k + ' = ' + k + ' · (' + b + ' + 1).' });
+      et = [['Je mets ' + k + ' en évidence au numérateur et je reconnais ' + k + ' dans le dénominateur.', m(H.fh(haut, bas) + ' = ' + H.fh(k + NB + '·' + NB + '(' + b + PLUS + '1)', k + NB + '·' + NB + q))],
+        ['Je simplifie par le facteur ' + k + '.', m(H.fh(b + 1, q) + (fr(b + 1, q).estEntier() ? ' = ' + H.f(f) : ''))]];
+      indice = 'Le nombre ' + k + ' apparaît deux fois en haut. Le dénominateur est-il un multiple de ' + k + ' ?';
+    } else if (type === 'difference') {
+      do { k = alea.choix([23, 29, 31, 37, 41, 43, 47, 53]); a = alea.entier(12, 45); b = alea.entier(2, 9); } while (a === k || (a + b) % 10 === 0 && (a - b) % 10 === 0);
+      haut = k + NB + '·' + NB + a + MOINS + k + NB + '·' + NB + b; bas = k + NB + '·' + NB + a + PLUS + k + NB + '·' + NB + b;
+      f = fr(a - b, a + b); expr = '(' + k + '*' + a + '-' + k + '*' + b + ')/(' + k + '*' + a + '+' + k + '*' + b + ')';
+      pieges.push({ valeur: fr(-1), message: MESSAGE_TERME });
+      et = [['Je mets ' + k + ' en évidence en haut et en bas.', m(H.fh(haut, bas) + ' = ' + H.fh(k + NB + '·' + NB + '(' + a + MOINS + b + ')', k + NB + '·' + NB + '(' + a + PLUS + b + ')'))],
+        ['Je simplifie par le facteur ' + k + ', puis je calcule.', m(H.fh(a - b, a + b) + (O.pgcd(a - b, a + b) > 1 ? ' = ' + H.f(f) : ''))]];
+      indice = 'Ne calcule pas les produits : quel facteur est commun aux quatre produits ?';
+    } else if (type === 'consecutifs') {
+      n = 2 * alea.entier(60, 190) + 1; c = alea.choix([1, 2, 3]);
+      haut = String(n); bas = (n - c) + PLUS + n + PLUS + (n + c);
+      f = fr(1, 3); expr = n + '/(' + (n - c) + '+' + n + '+' + (n + c) + ')';
+      pieges.push({ valeur: fr(1, 2 * n), message: MESSAGE_TERME });
+      et = [['Je remarque que ' + (n - c) + ' + ' + (n + c) + ' = 2 · ' + n + ' : le dénominateur vaut 3 · ' + n + '.', m(H.fh(haut, bas) + ' = ' + H.fh(n, '3' + NB + '·' + NB + n))],
+        ['Je simplifie par le facteur ' + n + '.', m(H.fh(1, 3))]];
+      indice = 'Observe les trois nombres du dénominateur : que vaut la somme du premier et du dernier ?';
+    } else {
+      a = alea.entier(301, 899); b = a + alea.entier(11, 95);
+      haut = a + MOINS + b; bas = b + MOINS + a;
+      f = fr(-1); expr = '(' + a + '-' + b + ')/(' + b + '-' + a + ')';
+      pieges.push({ valeur: fr(1), message: 'Attention au signe : ' + a + ' – ' + b + ' et ' + b + ' – ' + a + ' sont deux nombres <strong>opposés</strong>, pas égaux.' });
+      pieges.push({ valeur: fr(0), message: 'Le numérateur ne vaut pas 0 : ' + a + ' – ' + b + ' = ' + M.formaterNombre(a - b) + '.' });
+      et = [['Je calcule les deux différences : elles sont opposées.', m(H.fh(haut, bas) + ' = ' + H.fh(M.formaterNombre(a - b), b - a))],
+        ['Le quotient de deux nombres opposés vaut – 1.', m(H.f(f))]];
+      indice = 'Compare le numérateur et le dénominateur : sont-ils égaux ?';
+    }
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Trouve la fraction irréductible (ou l\'entier) égale à cette expression :</p><p class="calcul">' + m(H.fh(haut, bas)) + '</p>',
+      consigne: 'Donne le résultat sous sa forme <strong>la plus simple</strong>.',
+      indice: indice,
+      reponse: { type: 'valeur', valeur: f, forme: 'irreductible' },
+      pieges: pieges.filter(function (pg) { return !pg.valeur.egal(f); }),
+      etapes: O.etapes(et),
+      rubrique: R.amplifier,
+      nombres: [],
+      controle: { expr: expr },
+      attenduHtml: H.f(f)
+    });
+  }
+
+  /** 10e — « simplifications sauvages » : juger si une simplification est permise (F105). */
+  function vraiFauxSauvage(alea, d) {
+    var PLUS = ' + ';
+    var type = d <= 4 ? alea.choix(['termes', 'facteurs', 'sommeEgale']) : alea.choix(['termes', 'facteurs', 'sommeEgale', 'chiffres', 'puissances']);
+    var k, a, b, gauche, droite, vrai, bonne, mauvaises, et, u, v, c, exprG, exprD;
+    var kmin = d <= 4 ? 3 : 13, kmax = d <= 4 ? 12 : 29, tmax = d <= 4 ? 30 : 70;
+    if (type === 'termes') {
+      do { k = alea.entier(kmin, kmax); a = alea.entier(2, tmax); b = alea.entier(2, tmax); } while (a === b || a === k || b === k);
+      gauche = H.fh(k + PLUS + a, k + PLUS + b); droite = H.fh(a, b); vrai = false;
+      exprG = '(' + k + '+' + a + ')/(' + k + '+' + b + ')'; exprD = a + '/' + b;
+      bonne = k + ' est un terme d\'une somme, pas un facteur : ' + m(H.fh(k + PLUS + a, k + PLUS + b) + ' = ' + H.fh(k + a, k + b)) + ', ce qui n\'est pas égal à ' + m(H.fh(a, b)) + '.';
+      mauvaises = [
+        { h: 'Vrai, car on a simplifié par ' + k + ' en haut et en bas.', message: 'On ne peut simplifier que par un <strong>facteur</strong> commun. Ici, ' + k + ' est ajouté : c\'est un terme.' },
+        { h: 'Vrai, car on a enlevé le même nombre au numérateur et au dénominateur.', message: 'Enlever le même nombre en haut et en bas change la valeur d\'une fraction : ' + m(H.fh(2, 3)) + ' n\'est pas égal à ' + m(H.fh(1, 2)) + '.' },
+        { h: 'Faux, car on ne peut jamais simplifier une fraction qui contient un calcul.', message: 'La conclusion est juste, mais pas la raison : si le numérateur et le dénominateur sont des <strong>produits</strong>, on peut simplifier par un facteur commun.' }
+      ];
+      et = [['Je calcule les deux sommes.', m(H.fh(k + PLUS + a, k + PLUS + b) + ' = ' + H.fh(k + a, k + b) + (O.pgcd(k + a, k + b) > 1 ? ' = ' + H.f(fr(k + a, k + b)) : ''))],
+        ['Je compare avec la fraction proposée : les produits en croix sont différents.', m((k + a) + ' · ' + b + ' = ' + M.formaterNombre((k + a) * b)) + ', mais ' + m((k + b) + ' · ' + a + ' = ' + M.formaterNombre((k + b) * a))]];
+    } else if (type === 'facteurs') {
+      do { k = alea.entier(kmin, kmax); a = alea.entier(2, d <= 4 ? 12 : 30); b = alea.entier(2, d <= 4 ? 12 : 30); } while (a === b || a === k || b === k);
+      gauche = H.fh(k + NB + '·' + NB + a, k + NB + '·' + NB + b); droite = H.fh(a, b); vrai = true;
+      exprG = '(' + k + '*' + a + ')/(' + k + '*' + b + ')'; exprD = a + '/' + b;
+      bonne = k + ' est un facteur commun du numérateur et du dénominateur : on peut simplifier par ' + k + '.';
+      mauvaises = [
+        { h: 'Faux, car il faut d\'abord calculer les deux produits.', message: 'Calculer d\'abord est possible, mais pas nécessaire : simplifier par un facteur commun ne change pas la valeur de la fraction.' },
+        { h: 'Faux, car on ne peut pas supprimer un nombre en haut et en bas.', message: 'On le peut quand ce nombre est un <strong>facteur</strong> du numérateur et du dénominateur : c\'est une division par ' + k + '.' },
+        { h: 'Vrai, car on peut toujours supprimer un nombre écrit en haut et en bas.', message: 'La conclusion est juste, mais pas la raison : ce n\'est permis que pour un facteur d\'un produit, jamais pour un terme d\'une somme.' }
+      ];
+      et = [['Le numérateur et le dénominateur sont des produits qui ont le facteur ' + k + ' en commun.', m(H.fh(k + NB + '·' + NB + a, k + NB + '·' + NB + b) + ' = ' + H.fh(a, b))],
+        ['Vérification en calculant les produits.', m(H.fh(k * a, k * b) + ' = ' + H.f(fr(a, b)))]];
+    } else if (type === 'sommeEgale') {
+      k = alea.entier(kmin, kmax); u = alea.entier(2, 4); do { v = alea.entier(2, 5); } while (v === u || O.pgcd(u, v) !== 1);
+      var rep = function (n, sep) { var t = []; for (var i = 0; i < n; i++) t.push(k); return t.join(sep); };
+      gauche = H.fh(rep(u, PLUS), rep(v, PLUS)); droite = H.fh(u, v); vrai = true;
+      exprG = '(' + rep(u, '+') + ')/(' + rep(v, '+') + ')'; exprD = u + '/' + v;
+      bonne = 'le numérateur vaut ' + u + ' · ' + k + ' et le dénominateur ' + v + ' · ' + k + ' : on simplifie par le facteur ' + k + '.';
+      mauvaises = [
+        { h: 'Faux, car on ne simplifie jamais quand il y a des additions.', message: 'On ne simplifie pas terme à terme, mais ici chaque somme s\'écrit comme un produit : ' + u + ' · ' + k + ' et ' + v + ' · ' + k + '.' },
+        { h: 'Vrai, car on a supprimé un ' + k + ' en haut et un ' + k + ' en bas.', message: 'La conclusion est juste, mais pas la raison : supprimer un terme en haut et en bas ne donnerait pas ' + m(H.fh(u, v)) + '.' },
+        { h: 'Faux, car le résultat vaut 1.', message: 'Il n\'y a pas le même nombre de termes en haut (' + u + ') et en bas (' + v + ').' }
+      ];
+      et = [['J\'écris chaque somme de termes égaux comme un produit.', m(H.fh(rep(u, PLUS), rep(v, PLUS)) + ' = ' + H.fh(u + NB + '·' + NB + k, v + NB + '·' + NB + k))],
+        ['Je simplifie par le facteur ' + k + '.', m(H.fh(u, v))]];
+    } else if (type === 'chiffres') {
+      do { u = alea.entier(11, 39); v = alea.entier(12, 59); c = alea.entier(1, 9); a = 10 * u + c; b = 10 * v + c; } while (u === v || u % 10 === 0 || v % 10 === 0 || a * v === b * u);
+      gauche = H.fh(a, b); droite = H.fh(u, v); vrai = false;
+      exprG = a + '/' + b; exprD = u + '/' + v;
+      bonne = 'supprimer le chiffre ' + c + ' n\'est pas une division : ' + m(a + ' · ' + v + ' = ' + M.formaterNombre(a * v)) + ', mais ' + m(b + ' · ' + u + ' = ' + M.formaterNombre(b * u)) + '.';
+      mauvaises = [
+        { h: 'Vrai, car on a simplifié par ' + c + ' en haut et en bas.', message: 'Simplifier par ' + c + ', c\'est <strong>diviser</strong> par ' + c + ' : ' + a + ' : ' + c + ' ne donne pas ' + u + '.' },
+        { h: 'Vrai, car on a enlevé le même chiffre au numérateur et au dénominateur.', message: 'Un chiffre des unités n\'est pas un facteur du nombre : ' + a + ' = ' + u + ' · 10 + ' + c + '.' },
+        { h: 'Faux, car une fraction écrite avec des nombres de trois chiffres est toujours irréductible.', message: 'La conclusion est juste, mais pas la raison : ' + m(H.fh(100, 200) + ' = ' + H.fh(1, 2)) + '.' }
+      ];
+      et = [['Je compare les deux fractions avec les produits en croix.', m(a + ' · ' + v + ' = ' + M.formaterNombre(a * v)) + ' et ' + m(b + ' · ' + u + ' = ' + M.formaterNombre(b * u))],
+        ['Les produits sont différents : les fractions ne sont pas égales.', '']];
+    } else {
+      k = alea.entier(3, 19); u = alea.entier(2, 3);
+      var kp = function (e) { return k + M.texteExposant(e); };
+      gauche = H.fh(kp(u) + PLUS + kp(u + 1), kp(u)); droite = '1' + PLUS + k; vrai = true;
+      exprG = '(' + k + '^' + u + '+' + k + '^' + (u + 1) + ')/' + k + '^' + u; exprD = '1+' + k;
+      bonne = m(kp(u) + PLUS + kp(u + 1) + ' = ' + kp(u) + ' · (1' + PLUS + k + ')') + ' : on simplifie par le facteur ' + m(kp(u)) + '.';
+      mauvaises = [
+        { h: 'Faux, car ' + m(kp(u) + PLUS + kp(u + 1) + ' = ' + kp(2 * u + 1)) + '.', message: 'On additionne les exposants pour un <strong>produit</strong> de puissances, pas pour une somme.' },
+        { h: 'Faux, car en supprimant ' + m(kp(u)) + ' en haut et en bas, il reste ' + m(kp(u + 1)) + '.', message: 'Supprimer un terme n\'est pas permis ; de plus ' + m(H.fh(kp(u), kp(u)) + ' = 1') + ', pas 0.' },
+        { h: 'Faux, car on ne simplifie jamais quand il y a une addition.', message: 'On peut mettre ' + m(kp(u)) + ' en évidence : le numérateur devient alors un produit.' }
+      ];
+      et = [['Je partage la fraction en deux (ou je mets ' + m(kp(u)) + ' en évidence).', m(gauche + ' = ' + H.fh(kp(u), kp(u)) + PLUS + H.fh(kp(u + 1), kp(u)))],
+        ['Je simplifie chaque fraction.', m('1' + PLUS + k + ' = ' + (1 + k))]];
+    }
+    return O.vraiFaux({
+      enonce: '<p>Un élève a écrit cette égalité. Est-elle correcte ?</p><p class="calcul">' + m(gauche + ' = ' + droite) + '</p>',
+      vrai: vrai,
+      bonne: bonne,
+      mauvaises: mauvaises,
+      indice: 'On ne peut simplifier que par un facteur commun à tout le numérateur et à tout le dénominateur.',
+      etapes: O.etapes(et),
+      rubrique: R.amplifier,
+      nombres: [],
+      // l'égalité est recalculée par les tests : les deux membres ont-ils la même valeur ?
+      controle: { type: 'vf', a: exprG, relation: '=', b: exprD, mesure: { ops: 1, etapes: 1 } }
+    }, alea);
+  }
+
+  /* =====================================================================
    * Objectif : écriture décimale <-> fraction
    * ===================================================================== */
 
@@ -1746,32 +2081,370 @@
    * ===================================================================== */
 
 
+  /* =====================================================================
+   * PALIER D5 (niveau 2 seulement) — objectifs de 9e
+   * ---------------------------------------------------------------------
+   * Types d'exercices repris de la colonne « Activités pour le niveau 2 » du fichier
+   * d'objectifs NO 9.3 (nombres jamais recopiés) :
+   *   F202, F204 (tableaux d'écritures), L190 (décimal -> fraction irréductible),
+   *   F170 (« est-ce bien 3/4 ? »), L166, L179 (comparer), L228, L232 (part d'une part),
+   *   F220, F221, F223 (additions à trou, écritures mêlées), L203 (problèmes).
+   * ===================================================================== */
+
+  var FOIS = NB + '·' + NB;
+  function signeH(negatif, h) { return (negatif ? '–' + NB : '') + h; }
+
+  /** Vocabulaire et ensembles : écriture « déguisée » à simplifier avant de répondre (F204). */
+  function questionEnsembleDeguise(alea) {
+    var type = alea.choix(['N', 'Z', 'Q', 'Q']);
+    var num, den, negatif = false, simple;
+    if (type === 'Q') {
+      var b0 = alea.choix([3, 4, 5, 6, 7, 8]), a0 = premierAvec(alea, b0, 2 * b0), k = alea.choix([6, 7, 8, 9, 11, 12, 13]);
+      num = a0 * k; den = b0 * k; negatif = alea.suivant() < 0.3;
+    } else {
+      den = alea.choix([7, 11, 13, 17, 19, 23]); num = den * alea.entier(2, 20); negatif = type === 'Z';
+    }
+    var x = fr(negatif ? -num : num, den);
+    var xh = m(signeH(negatif, H.fh(num, den)));
+    simple = m(H.f(x));
+    var noms = { N: 'ℕ (nombres naturels)', Z: 'ℤ (nombres entiers relatifs)', Q: 'ℚ (nombres rationnels)' };
+    var messages = {
+      N: x.estEntier() ? 'Regarde le signe : un nombre naturel est positif ou nul.' : 'Simplifie d\'abord : ' + xh + ' = ' + simple + ', ce n\'est pas un nombre entier.',
+      Z: x.estEntier() ? 'Il existe un ensemble plus petit : ' + xh + ' = ' + simple + ' est un entier positif.' : 'Simplifie d\'abord : ' + xh + ' = ' + simple + ', ce n\'est pas un nombre entier.',
+      Q: 'Il existe un ensemble plus petit : simplifie, ' + xh + ' = ' + simple + ' est un nombre entier.'
+    };
+    return O.choix({
+      type: 'directe',
+      enonce: '<p>Quel est le <strong>plus petit</strong> ensemble de nombres qui contient ' + xh + ' ?</p>',
+      consigne: 'Simplifie d\'abord l\'écriture. Rappel : ℕ ⊂ ℤ ⊂ ℚ.',
+      indice: 'Une écriture fractionnaire peut cacher un nombre entier : divise le numérateur par le dénominateur.',
+      choix: ['N', 'Z', 'Q'].map(function (e) { return { h: noms[e], juste: e === type, cle: e, message: e === type ? '' : messages[e] }; }),
+      ordreFixe: true,
+      etapes: O.etapes([['Je simplifie l\'écriture.', xh + ' = ' + simple],
+        [type === 'N' ? 'C\'est un entier positif : il appartient à ℕ.' : type === 'Z' ? 'C\'est un entier négatif : il appartient à ℤ, mais pas à ℕ.' : 'Ce n\'est pas un entier : il appartient à ℚ, mais pas à ℤ.', '']]),
+      rubrique: R.ensembles,
+      nombres: [fr(num), fr(den)],
+      controle: { type: 'ensemble', x: (negatif ? '-' : '') + num + '/' + den, liste: ['N', 'Z', 'Q'], cle: type }
+    }, alea);
+  }
+
+  /** Écritures usuelles : multiples de 1/4, 1/5 et 1/8, dans les deux sens (F202). */
+  function questionUsuelle5(alea) {
+    var f = alea.choix([[3, 8], [5, 8], [7, 8], [9, 8], [11, 8], [13, 8], [5, 4], [7, 4], [9, 4], [6, 5], [7, 5], [9, 5], [11, 5]]);
+    var x = fr(f[0], f[1]), unite = fr(1, f[1]);
+    var et = [['Je pars de l\'écriture usuelle ' + m(H.f(unite) + ' = ' + H.n(unite)) + '.', ''],
+      ['Je multiplie par ' + f[0] + '.', m(H.f(x) + ' = ' + f[0] + FOIS + H.n(unite) + ' = ' + H.n(x))]];
+    if (alea.suivant() < 0.5) {
+      return O.saisie({
+        type: 'directe',
+        enonce: '<p>Écris ' + m(H.f(x)) + ' en écriture décimale.</p>',
+        consigne: 'Réponse en écriture décimale (avec la virgule), sans poser la division.',
+        indice: 'Combien vaut ' + m(H.f(unite)) + ' en écriture décimale ?',
+        reponse: { type: 'valeur', valeur: x, forme: 'decimal' },
+        pieges: [{ valeur: fr(f[0] * 10 + f[1], 10), message: 'On n\'écrit pas le numérateur et le dénominateur de part et d\'autre de la virgule : ' + m(H.f(x)) + ' vaut ' + f[0] + ' fois ' + m(H.n(unite)) + '.' }],
+        etapes: O.etapes(et), rubrique: R.ecrituresDecimales, nombres: [x], controle: { expr: f[0] + '/' + f[1], conversion: true }
+      });
+    }
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Écris ' + m(H.n(x)) + ' sous forme de fraction.</p>',
+      consigne: 'Donne la <strong>fraction irréductible</strong>.',
+      indice: 'Combien de fois ' + m(H.n(unite)) + ' y a-t-il dans ' + m(H.n(x)) + ' ?',
+      reponse: { type: 'valeur', valeur: x, forme: 'irreductible' },
+      pieges: [],
+      etapes: O.etapes([['Je reconnais un multiple de ' + m(H.n(unite) + ' = ' + H.f(unite)) + '.', m(H.n(x) + ' = ' + f[0] + FOIS + H.n(unite))],
+        ['J\'écris la fraction.', m(H.n(x) + ' = ' + H.f(x))]]),
+      rubrique: R.ecrituresDecimales, nombres: [x], controle: { expr: f[0] + '/' + f[1], conversion: true }, attenduHtml: H.f(x)
+    });
+  }
+
+  /** Décimal à trois décimales, parfois négatif -> fraction irréductible (L190). */
+  function questionDecVersFraction5(alea) {
+    var den = alea.choix([8, 25, 40, 125, 200, 250]), num;
+    do { num = alea.entier(den + 1, Math.min(9 * den, 2400)); } while (O.pgcd(num, den) !== 1);
+    if (alea.suivant() < 0.4) num = premierAvec(alea, den, den - 1);
+    var negatif = alea.suivant() < 0.35;
+    var x = fr(negatif ? -num : num, den);
+    var dec = O.nbDecimales(x), p10 = Math.pow(10, dec), brut = Math.round(num * p10 / den), g = O.pgcd(brut, p10);
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Écris ' + m(H.n(x)) + ' sous forme de fraction.</p>',
+      consigne: 'Donne la <strong>fraction irréductible</strong>' + (negatif ? ' (avec son signe)' : '') + '.',
+      indice: 'Le nombre a ' + dec + ' décimale' + (dec > 1 ? 's' : '') + ' : écris-le d\'abord avec le dénominateur ' + M.formaterNombre(p10) + ', puis simplifie.',
+      reponse: { type: 'valeur', valeur: x, forme: 'irreductible' },
+      pieges: negatif ? [{ valeur: x.oppose(), message: 'N\'oublie pas le signe : le nombre de départ est négatif.' }] : [],
+      etapes: O.etapes([['J\'écris le nombre avec le dénominateur ' + M.formaterNombre(p10) + '.', m(H.n(x) + ' = ' + signeH(negatif, H.fh(M.formaterNombre(brut), M.formaterNombre(p10))))],
+        ['Je simplifie par ' + g + ' (pgdc).', m(signeH(negatif, H.fh(M.formaterNombre(brut), M.formaterNombre(p10))) + ' = ' + H.f(x))]]),
+      rubrique: R.ecrituresDecimales, nombres: [x], controle: { expr: (negatif ? '-' : '') + num + '/' + den, conversion: true }, attenduHtml: H.f(x)
+    });
+  }
+
+  /** Représenter : « est-ce bien 3/4 ? » avec une figure partagée autrement (F170). */
+  function vraiFauxPartColoriee(alea) {
+    var f = alea.choix([[3, 4], [2, 3], [3, 5], [5, 6], [1, 4], [3, 8], [2, 5]]);
+    var k = alea.entier(2, f[1] <= 4 ? 4 : 3), n = f[1] * k, vrai = alea.suivant() < 0.5;
+    var c = f[0] * k + (vrai ? 0 : alea.choix([-1, 1]));
+    var qui = prenom(alea), g = O.pgcd(c, n);
+    var fh = m(H.fh(f[0], f[1])), ch = m(H.fh(c, n)), simple = m(H.f(fr(c, n)));
+    return O.vraiFaux({
+      enonce: '<p>' + qui + ' affirme : « J\'ai colorié les ' + fh + ' de cette figure. »</p>',
+      visuel: { type: alea.choix(['barre', 'disque']), parts: n, colorees: c },
+      vrai: vrai,
+      bonne: vrai ? c + ' parts sur ' + n + ' sont coloriées, et ' + ch + ' = ' + fh + ' (on simplifie par ' + k + ').'
+        : c + ' parts sur ' + n + ' sont coloriées : ' + ch + (g > 1 ? ' = ' + simple : '') + ', ce qui n\'est pas égal à ' + fh + ' (il faudrait ' + (f[0] * k) + ' parts).',
+      mauvaises: vrai ? [
+        { h: 'Faux, car la figure n\'est pas partagée en ' + f[1] + ' parts.', message: 'Le nombre de parts peut être différent : ' + ch + ' et ' + fh + ' sont des fractions équivalentes.' },
+        { h: 'Faux, car il y a ' + c + ' parts coloriées, et non ' + f[0] + '.', message: 'Compare les fractions, pas seulement les numérateurs : ' + ch + ' = ' + fh + '.' },
+        { h: 'Vrai, car une grande partie de la figure est coloriée.', message: 'La conclusion est juste, mais pas la raison : une fraction est une valeur exacte, il faut compter les parts.' }
+      ] : [
+        { h: 'Vrai, car ' + ch + ' se simplifie en ' + fh + '.', message: 'Vérifie : ' + fh + ' de ' + n + ' parts, c\'est ' + (f[0] * k) + ' parts, pas ' + c + '.' },
+        { h: 'Vrai, car c\'est à peu près ' + fh + ' de la figure.', message: 'Une fraction est une valeur exacte : « à peu près » ne suffit pas.' },
+        { h: 'Faux, car la figure n\'est pas partagée en ' + f[1] + ' parts.', message: 'La conclusion est juste, mais pas la raison : avec ' + n + ' parts, on peut très bien colorier ' + fh + ' de la figure (' + (f[0] * k) + ' parts).' }
+      ],
+      indice: 'Compte les parts coloriées et le nombre total de parts, puis compare la fraction obtenue avec ' + fh + '.',
+      etapes: O.etapes([['Je compte : ' + c + ' parts coloriées sur ' + n + '.', ch],
+        ['Je cherche combien de parts représentent ' + fh + ' de la figure.', m(H.fh(f[0], f[1]) + ' = ' + H.fh(f[0] + FOIS + k, f[1] + FOIS + k) + ' = ' + H.fh(f[0] * k, n))]]),
+      rubrique: R.amplifier,
+      nombres: [fr(c), fr(n)],
+      controle: { type: 'vf', a: c + '/' + n, relation: '=', b: f[0] + '/' + f[1] }
+    }, alea);
+  }
+
+  /** Représenter une quantité par une fraction, en deux étapes (L166). */
+  function problemeQuantiteReste(alea) {
+    var ctx = alea.choix([
+      { groupe: 'jeunes de l\'école de musique', a: 'jouent d\'un instrument à cordes', b: 'd\'un instrument à vent', q: 'jouent d\'un autre instrument' },
+      { groupe: 'élèves inscrits au camp de ski', a: 'font du ski alpin', b: 'du snowboard', q: 'font du ski de fond' },
+      { groupe: 'membres du club de sport', a: 'pratiquent l\'unihockey', b: 'le volley', q: 'pratiquent un autre sport' }
+    ]);
+    var N, a, b, r;
+    do { N = alea.choix([24, 30, 36, 40, 45, 48, 60, 72]); a = alea.entier(5, N / 2); b = alea.entier(4, N / 3); r = N - a - b; } while (r < 3 || O.pgcd(r, N) === 1 || O.pgcd(r, N) === r);
+    var f = fr(r, N);
+    return O.saisie({
+      type: 'probleme',
+      enonce: '<p>Sur les ' + N + ' ' + ctx.groupe + ' de ' + lieu(alea) + ', ' + a + ' ' + ctx.a + ' et ' + b + ' ' + ctx.b + ' ; personne ne fait les deux.</p><p>Quelle fraction du groupe représentent ceux qui ' + ctx.q + ' ?</p>',
+      consigne: 'Donne la <strong>fraction irréductible</strong>.',
+      indice: 'Calcule d\'abord combien de personnes ' + ctx.q + '.',
+      reponse: { type: 'valeur', valeur: f, forme: 'irreductible' },
+      pieges: [{ valeur: fr(a + b, N), message: 'Tu as donné la fraction de ceux qui sont déjà cités : on demande les autres.' }].filter(function (pg) { return !pg.valeur.egal(f); }),
+      etapes: O.etapes([['Je calcule le nombre de personnes restantes.', m(N + ' – ' + a + ' – ' + b + ' = ' + r)],
+        ['J\'écris la fraction du groupe.', m(H.fh(r, N))],
+        ['Je simplifie par ' + O.pgcd(r, N) + '.', m(H.fh(r, N) + ' = ' + H.f(f))]]),
+      rubrique: R.vocabulaireFractions, nombres: [fr(N), fr(a), fr(b)], controle: { expr: '(' + N + '-' + a + '-' + b + ')/' + N }, attenduHtml: H.f(f)
+    });
+  }
+
+  /** Comparer : ranger quatre nombres d'écritures différentes (L179, F202). */
+  function questionOrdonnerMixte(alea) {
+    var liste, vals, ok;
+    do {
+      var b1 = alea.choix([3, 6, 7, 9, 11, 12]), a1 = premierAvec(alea, b1, b1 - 1);
+      var b2 = alea.choix([3, 4, 6, 7, 8]), a2 = b2 + premierAvec(alea, b2, b2 - 1);
+      var d1 = fr(alea.entier(5, 95), 100), d2 = fr(alea.entier(11, 19), 10);
+      var b3 = alea.choix([4, 5, 8]), a3 = premierAvec(alea, b3, b3 - 1), k3 = alea.choix([3, 4, 6]);
+      liste = [
+        { v: fr(a1, b1), t: a1 + '/' + b1, h: H.fh(a1, b1) },
+        { v: fr(a2, b2), t: a2 + '/' + b2, h: H.fh(a2, b2) },
+        { v: d1, t: M.formaterNombre(d1), h: H.n(d1), e: d1.toString() },
+        { v: alea.suivant() < 0.5 ? d2 : fr(a3, b3), t: '', h: '' }
+      ];
+      if (liste[3].v === d2) { liste[3].t = M.formaterNombre(d2); liste[3].h = H.n(d2); liste[3].e = d2.toString(); }
+      else { liste[3].t = (a3 * k3) + '/' + (b3 * k3); liste[3].h = H.fh(a3 * k3, b3 * k3); }
+      vals = liste.map(function (x) { return x.v.valeur(); }).sort(function (u, w) { return u - w; });
+      ok = vals.every(function (x, i) { return i === 0 || x - vals[i - 1] > 0.015; });
+    } while (!ok);
+    liste = alea.melanger(liste);
+    var croissant = alea.suivant() < 0.5;
+    var tri = liste.slice().sort(function (u, w) { return croissant ? u.v.compare(w.v) : w.v.compare(u.v); });
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Range ces nombres dans l\'ordre <strong>' + (croissant ? 'croissant' : 'décroissant') + '</strong> :</p><p class="calcul">' + m(H.liste(liste.map(function (x) { return x.h; }))) + '</p>',
+      consigne: 'Recopie les quatre nombres séparés par des points-virgules « ; », du plus ' + (croissant ? 'petit au plus grand' : 'grand au plus petit') + '.',
+      indice: 'Écris chaque nombre en écriture décimale (au centième près) pour les comparer.',
+      reponse: { type: 'liste', valeurs: tri.map(function (x) { return x.v; }), ordonne: true, croissant: croissant, textes: tri.map(function (x) { return x.t; }), textesHtml: tri.map(function (x) { return x.h; }) },
+      pieges: [],
+      etapes: O.etapes([['J\'écris chaque nombre en écriture décimale (valeur approchée au millième).', m(H.liste(liste.map(function (x) { return x.h + ' ≈ ' + H.arrondi(x.v, 3); })))],
+        ['Je range les nombres.', m(tri.map(function (x) { return x.h; }).join(croissant ? ' &lt; ' : ' &gt; '))]]),
+      rubrique: R.comparer,
+      nombres: liste.map(function (x) { return x.v; }),
+      controle: { type: 'ordre', exprs: liste.map(function (x) { return x.e || x.t; }), croissant: croissant }
+    });
+  }
+
+  /** Part d'une part, ou retrouver le tout à partir d'une part (L228, L232). */
+  function problemePartDePart(alea) {
+    var a, b, c, e, k, N, res, ou = lieu(alea);
+    if (alea.suivant() < 0.5) {
+      do { b = alea.choix([3, 4, 5, 6, 7]); a = alea.entier(2, b - 1); c = alea.choix([2, 3, 4, 5]); e = c > 2 && alea.suivant() < 0.5 ? c - 1 : 1; k = alea.entier(2, 12); N = b * c * k; } while (O.pgcd(a, b) !== 1 || N > 500 || N < 60);
+      res = N * a / b * e / c;
+      var premier = N * a / b;
+      return O.saisie({
+        type: 'probleme',
+        enonce: '<p>La société de gymnastique de ' + ou + ' compte ' + N + ' membres. Les ' + m(H.fh(a, b)) + ' des membres ont moins de 16 ans et, parmi eux, ' + (e === 1 ? 'le' : 'les') + ' ' + m(H.fh(e, c)) + ' participe' + (e === 1 ? '' : 'nt') + ' au camp d\'été.</p><p>Combien de membres participent au camp d\'été ?</p>',
+        consigne: 'Écris un nombre entier.',
+        indice: 'Calcule d\'abord le nombre de membres de moins de 16 ans.',
+        reponse: { type: 'valeur', valeur: fr(res), forme: 'entier' },
+        pieges: [{ valeur: fr(premier), message: 'C\'est le nombre de membres de moins de 16 ans : il faut encore en prendre ' + m(H.fh(e, c)) + '.' },
+          { valeur: fr(N * e, c), message: 'Tu as pris ' + m(H.fh(e, c)) + ' de tous les membres : cette fraction ne porte que sur les moins de 16 ans.' }].filter(function (pg) { return !pg.valeur.egal(fr(res)); }),
+        etapes: O.etapes([['Je calcule le nombre de membres de moins de 16 ans.', m(H.fh(a, b) + ' de ' + N + ' = ' + N + ' : ' + b + FOIS + a + ' = ' + premier)],
+          ['Je prends ' + m(H.fh(e, c)) + ' de ce nombre.', m(H.fh(e, c) + ' de ' + premier + ' = ' + premier + ' : ' + c + (e > 1 ? FOIS + e : '') + ' = ' + res)]]),
+        verification: 'Vérification : ' + m(H.fh(a, b) + FOIS + H.fh(e, c) + ' = ' + H.f(fr(a * e, b * c))) + ' des membres, et ' + m(H.f(fr(a * e, b * c)) + ' de ' + N + ' = ' + res) + '. ✓',
+        rubrique: R.fractionNombre, nombres: [fr(N), fr(a, b), fr(e, c)], controle: { expr: N + '*(' + a + '/' + b + ')*(' + e + '/' + c + ')' }
+      });
+    }
+    do { b = alea.choix([3, 4, 5, 7, 8, 9]); a = alea.entier(2, b - 1); k = alea.entier(6, 60); } while (O.pgcd(a, b) !== 1 || b * k > 500 || b * k < 60);
+    var n = a * k, T = b * k;
+    return O.saisie({
+      type: 'probleme',
+      enonce: '<p>Lors d\'un concert à ' + ou + ', ' + n + ' places sont occupées : cela représente les ' + m(H.fh(a, b)) + ' des places de la salle.</p><p>Combien de places sont encore libres ?</p>',
+      consigne: 'Écris un nombre entier.',
+      indice: 'Si ' + a + ' parts valent ' + n + ' places, combien vaut une part ? Combien y a-t-il de parts en tout ?',
+      reponse: { type: 'valeur', valeur: fr(T - n), forme: 'entier' },
+      pieges: [{ valeur: fr(T), message: 'C\'est le nombre total de places : on demande les places libres.' },
+        { valeur: fr(n * a, b), message: 'Tu as pris ' + m(H.fh(a, b)) + ' de ' + n + ' : or ' + n + ' places représentent déjà les ' + m(H.fh(a, b)) + ' de la salle.' }].filter(function (pg) { return !pg.valeur.egal(fr(T - n)); }),
+      etapes: O.etapes([['Une part vaut ' + n + ' : ' + a + '.', m(n + ' : ' + a + ' = ' + k)],
+        ['La salle compte ' + b + ' parts.', m(b + FOIS + k + ' = ' + T)],
+        ['Je soustrais les places occupées.', m(T + ' – ' + n + ' = ' + (T - n))]]),
+      verification: 'Vérification : ' + m(H.fh(a, b) + ' de ' + T + ' = ' + n) + '. ✓',
+      rubrique: R.fractionNombre, nombres: [fr(n), fr(a, b)], controle: { expr: n + ':(' + a + '/' + b + ')-' + n }
+    });
+  }
+
+  /** Décimaux : deux opérations à enchaîner en respectant les priorités. */
+  function questionDecimaux5(alea) {
+    var a, b, c, res, html, expr, et;
+    function d1(min, max) { return fr(alea.entier(min, max), 10); }
+    function t(x) { return '(' + x.toString() + ')'; }
+    if (alea.suivant() < 0.5) {
+      var moins = alea.suivant() < 0.5;
+      do { b = d1(12, 95); c = d1(11, 45); a = d1(25, 400); res = moins ? a.moins(b.fois(c)) : a.plus(b.fois(c)); } while (res.signe() <= 0 || b.estEntier() || c.estEntier() || res.abs().compare(300) > 0);
+      html = H.n(a) + (moins ? ' – ' : ' + ') + H.n(b) + FOIS + H.n(c);
+      expr = t(a) + (moins ? '-' : '+') + t(b) + '*' + t(c);
+      et = [['La multiplication est prioritaire.', m(H.n(b) + FOIS + H.n(c) + ' = ' + H.n(b.fois(c)))],
+        ['J\'effectue ensuite ' + (moins ? 'la soustraction' : 'l\'addition') + '.', m(H.n(a) + (moins ? ' – ' : ' + ') + H.n(b.fois(c)) + ' = ' + H.n(res))]];
+    } else {
+      c = alea.choix([fr(1, 4), fr(1, 2), fr(1, 5), fr(5, 2), fr(3, 2), fr(1, 20), fr(2, 5)]);
+      var somme;
+      do { res = alea.suivant() < 0.5 ? fr(alea.entier(4, 60)) : d1(15, 195); somme = res.fois(c); a = d1(3, 120); b = somme.moins(a); } while (b.compare(fr(3, 10)) < 0 || O.nbDecimales(somme) > 2 || O.nbDecimales(b) > 2 || a.egal(b));
+      html = '(' + H.n(a) + ' + ' + H.n(b) + ') : ' + H.n(c);
+      expr = '(' + t(a) + '+' + t(b) + '):' + t(c);
+      et = [['Je calcule d\'abord la parenthèse.', m(H.n(a) + ' + ' + H.n(b) + ' = ' + H.n(somme))],
+        ['Je divise par ' + m(H.n(c)) + (c.compare(1) < 0 ? ' : le résultat est plus grand que ' + m(H.n(somme)) + '.' : '.'), m(H.n(somme) + ' : ' + H.n(c) + ' = ' + H.n(res))]];
+    }
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>Calcule sans calculatrice :</p><p class="calcul">' + m(html) + '</p>',
+      consigne: 'Respecte les priorités des opérations. Écris un nombre décimal.',
+      indice: 'Quelle opération faut-il effectuer en premier ?',
+      reponse: { type: 'valeur', valeur: res, forme: 'decimal' },
+      estimation: true,
+      pieges: [],
+      etapes: O.etapes(et),
+      rubrique: R.priorites, nombres: [a, b, c], controle: { expr: expr }
+    });
+  }
+
+  /** Additions et soustractions de fractions : à trou, écritures mêlées, fractions à simplifier d'abord (F220, F221, F223). */
+  function questionAddSous5(alea) {
+    var DENS = [2, 3, 4, 5, 6, 8, 10, 12];
+    var type = alea.choix(['trou', 'mixte', 'simplifier']), f1, f2, res, html, expr, et, indice, b, d;
+    function fracAlea(maxNum) { var den = alea.choix(DENS); return fr(premierAvec(alea, den, maxNum || den + 3), den); }
+    if (type === 'trou') {
+      var somme;
+      do { f1 = fracAlea(); res = fracAlea(); somme = f1.plus(res); } while (O.den(f1) === O.den(res) || O.den(somme) > 60);
+      html = H.f(f1) + ' + … = ' + H.f(somme);
+      expr = somme.toString() + '-' + f1.toString();
+      indice = 'Le nombre cherché est la différence entre le résultat et le premier terme.';
+      et = [['Je cherche le terme manquant par une soustraction.', m('… = ' + H.f(somme) + ' – ' + H.f(f1))],
+        ['Je mets les deux fractions au même dénominateur, je soustrais, puis je simplifie.', m(H.f(somme) + ' – ' + H.f(f1) + ' = ' + H.f(res))]];
+    } else if (type === 'mixte') {
+      var dec, moins;
+      do { dec = alea.choix([fr(1, 2), fr(1, 4), fr(3, 4), fr(3, 2), fr(5, 4), fr(1, 5), fr(2, 5), fr(6, 5), fr(13, 10), fr(7, 10)]); d = alea.choix([3, 6, 8, 12]); f2 = fr(premierAvec(alea, d, d - 1), d); moins = alea.suivant() < 0.6; res = moins ? dec.moins(f2) : dec.plus(f2); } while (res.signe() <= 0);
+      f1 = dec;
+      html = H.n(dec) + (moins ? ' – ' : ' + ') + H.f(f2);
+      expr = dec.toString() + (moins ? '-' : '+') + f2.toString();
+      indice = 'Écris d\'abord ' + m(H.n(dec)) + ' sous forme de fraction.';
+      et = [['J\'écris le nombre décimal sous forme de fraction.', m(H.n(dec) + ' = ' + H.f(dec))],
+        ['Je mets au même dénominateur, je calcule, puis je simplifie.', m(H.f(dec) + (moins ? ' – ' : ' + ') + H.f(f2) + ' = ' + H.f(res))]];
+    } else {
+      var k1, k2, a1, a2, moins2;
+      do {
+        b = alea.choix([2, 3, 4, 5, 6]); d = alea.choix([2, 3, 4, 5, 6]); a1 = premierAvec(alea, b, b + 2); a2 = premierAvec(alea, d, d - 1);
+        k1 = alea.choix([4, 6, 7, 9, 11, 13]); k2 = alea.choix([3, 5, 8, 12]); moins2 = alea.suivant() < 0.5;
+        f1 = fr(a1, b); f2 = fr(a2, d); res = moins2 ? f1.moins(f2) : f1.plus(f2);
+      } while (b === d || res.signe() <= 0 || a1 * k1 > 100 || b * k1 > 100);
+      html = H.fh(a1 * k1, b * k1) + (moins2 ? ' – ' : ' + ') + H.fh(a2 * k2, d * k2);
+      expr = (a1 * k1) + '/' + (b * k1) + (moins2 ? '-' : '+') + (a2 * k2) + '/' + (d * k2);
+      indice = 'Simplifie chaque fraction avant de chercher un dénominateur commun.';
+      et = [['Je simplifie d\'abord chaque fraction.', m(H.fh(a1 * k1, b * k1) + ' = ' + H.f(f1)) + ' et ' + m(H.fh(a2 * k2, d * k2) + ' = ' + H.f(f2))],
+        ['Je mets au même dénominateur, je calcule, puis je simplifie.', m(H.f(f1) + (moins2 ? ' – ' : ' + ') + H.f(f2) + ' = ' + H.f(res))]];
+    }
+    return O.saisie({
+      type: 'directe',
+      enonce: '<p>' + (type === 'trou' ? 'Complète' : 'Calcule') + ' :</p><p class="calcul">' + m(html) + '</p>',
+      consigne: (type === 'trou' ? 'Écris le nombre qui manque' : 'Donne le résultat') + ' sous forme de <strong>fraction irréductible</strong> (ou d\'un entier).',
+      indice: indice,
+      reponse: { type: 'valeur', valeur: res, forme: 'irreductible' },
+      pieges: [],
+      etapes: O.etapes(et),
+      rubrique: R.addFractions, nombres: [f1, f2 || res], controle: { expr: expr }, attenduHtml: H.f(res)
+    });
+  }
+
+  /** Problème à deux fractions et un reste (L203, L228). */
+  function problemeDeuxFractions(alea) {
+    var paires = [[[1, 2], [1, 3]], [[2, 5], [1, 4]], [[1, 3], [2, 5]], [[3, 8], [1, 4]], [[1, 2], [3, 10]], [[2, 5], [1, 3]], [[1, 4], [1, 6]], [[3, 10], [1, 5]]];
+    var pr = alea.choix(paires), f1 = fr(pr[0][0], pr[0][1]), f2 = fr(pr[1][0], pr[1][1]);
+    var base = O.ppmc(pr[0][1], pr[1][1]), N;
+    N = base * alea.entier(Math.ceil(120 / base), Math.floor(480 / base));
+    var reste = fr(1).moins(f1).moins(f2), res = reste.fois(N);
+    return O.saisie({
+      type: 'probleme',
+      enonce: '<p>Une classe de ' + lieu(alea) + ' dispose de ' + H.chf(fr(N)) + ' pour sa course d\'école. Elle dépense ' + m(H.f(f1)) + ' de cette somme pour le transport et ' + m(H.f(f2)) + ' pour les repas. Le reste sert à payer les entrées.</p><p>Quelle somme reste-t-il pour les entrées ?</p>',
+      consigne: 'Réponse en francs.',
+      suffixe: 'francs',
+      indice: 'Cherche d\'abord quelle fraction de la somme reste pour les entrées.',
+      reponse: { type: 'montant', valeur: res },
+      pieges: [{ valeur: f1.plus(f2).fois(N), message: 'C\'est la somme dépensée pour le transport et les repas : on demande ce qui reste.' }].filter(function (pg) { return !pg.valeur.egal(res); }),
+      etapes: O.etapes([['J\'additionne les deux fractions dépensées.', m(H.f(f1) + ' + ' + H.f(f2) + ' = ' + H.f(f1.plus(f2)))],
+        ['Je calcule la fraction qui reste.', m('1 – ' + H.f(f1.plus(f2)) + ' = ' + H.f(reste))],
+        ['Je prends cette fraction de la somme.', m(H.f(reste) + ' de ' + N + ' = ' + H.n(res)) + ' francs']]),
+      verification: 'Vérification : transport ' + H.chf(f1.fois(N)) + ', repas ' + H.chf(f2.fois(N)) + ', entrées ' + H.chf(res) + ' ; le total fait bien ' + H.chf(fr(N)) + '. ✓',
+      rubrique: R.fractionNombre, nombres: [fr(N), f1, f2], controle: { expr: N + '*(1-' + f1.toString() + '-' + f2.toString() + ')' }
+    });
+  }
+
+  // « Simplifier » (calibrage validé) : nombres jusqu'à 50 dès D1, expressions à plusieurs facteurs dès D3.
+  var BORNES_SIMPLIFIER = { nombre: [50, 100, 200, 300, 500], den: [50, 100, 200, 300, 500], operations: [1, 3, 6, 7, 7], etapes: [1, 2, 3, 3, 3] };
+
   var objectifs = [
     {
       id: 'A9-vocabulaire', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Vocabulaire des fractions et ensembles ℕ, ℤ, ℚ',
       modeles: [
-        { type: 'directe', gen: function (a, p, c) { return questionNumDen(a, p); } },
-        { type: 'directe', gen: function (a) { return questionVocabulaire(a); } },
+        { type: 'directe', palierMax: 3, gen: function (a, p, c) { return questionNumDen(a, p); } },
+        { type: 'directe', palierMax: 4, gen: function (a) { return questionVocabulaire(a); } },
         { type: 'directe', gen: function (a, p, c) { return questionEnsemble(a, p, c, ['N', 'Z', 'Q'], poolEnsemblesNZQ(a, p)); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxEnsemble(a, p, ['N', 'Z']); } }
+        { type: 'vraifaux', gen: function (a, p) { return vraiFauxEnsemble(a, p, ['N', 'Z']); } },
+        { type: 'directe', palierMin: 5, d5: true, gen: function (a) { return questionEnsembleDeguise(a); } }
       ]
     },
     {
       id: 'A9-usuelles', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Écritures décimales de 1/2, 1/3, 1/4, 1/5, 1/8, 1/10, 1/100, 1/1000',
       modeles: [
+        { type: 'directe', palierMax: 4, gen: function (a, p) { return questionUsuelle(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionUsuelle(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionUsuelle(a, p); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxUsuelle(a, p); } }
+        { type: 'vraifaux', gen: function (a, p) { return vraiFauxUsuelle(a, p); } },
+        { type: 'directe', palierMin: 5, d5: true, gen: function (a) { return questionUsuelle5(a); } }
       ]
     },
     {
-      id: 'A9-simplifier', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
+      id: 'A9-simplifier', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3', bornesD: BORNES_SIMPLIFIER,
       titre: 'Simplifier, amplifier, fraction irréductible',
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionSimplifier(a, p); } },
-        { type: 'directe', gen: function (a, p) { return questionAmplifier(a, p); } },
+        { type: 'directe', d5: true, gen: function (a, p) { return questionSimplifier5(a, p); } },
+        { type: 'directe', palierMax: 4, gen: function (a, p) { return questionAmplifier(a, p); } },
         { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurSimplifier(a, p); } },
         { type: 'vraifaux', palierMin: 2, gen: function (a, p) { return vraiFauxIrreductible(a, p); } }
       ]
@@ -1780,18 +2453,21 @@
       id: 'A9-conversions', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Passer de l\'écriture décimale à la fraction et inversement',
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionDecVersFraction(a, p); } },
+        { type: 'directe', palierMax: 4, gen: function (a, p) { return questionDecVersFraction(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionFractionVersDec(a, p); } },
-        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurConversion(a, p); } }
+        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurConversion(a, p); } },
+        { type: 'directe', palierMin: 5, d5: true, gen: function (a) { return questionDecVersFraction5(a); } }
       ]
     },
     {
       id: 'A9-representer', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Représenter une fraction par un dessin, une quantité par une fraction',
       modeles: [
-        { type: 'visuel', gen: function (a, p) { return questionColorier(a, p); } },
+        { type: 'visuel', palierMax: 4, gen: function (a, p) { return questionColorier(a, p); } },
         { type: 'visuel', gen: function (a, p) { return questionLireFraction(a, p); } },
-        { type: 'probleme', gen: function (a, p) { return problemeQuantiteFraction(a, p); } }
+        { type: 'probleme', gen: function (a, p) { return problemeQuantiteFraction(a, p); } },
+        { type: 'vraifaux', palierMin: 5, d5: true, gen: function (a) { return vraiFauxPartColoriee(a); } },
+        { type: 'probleme', palierMin: 5, d5: true, gen: function (a) { return problemeQuantiteReste(a); } }
       ]
     },
     {
@@ -1799,48 +2475,54 @@
       titre: 'Comparer deux nombres (fractions ou nombres décimaux)',
       modeles: [
         { type: 'directe', gen: function (a, p, c) { return questionComparer(a, p, c); } },
-        { type: 'directe', gen: function (a, p, c) { return questionComparerDecimaux(a, p, c); } },
-        { type: 'vraifaux', gen: function (a, p, c) { return vraiFauxComparer(a, p, c); } }
+        { type: 'directe', palierMax: 4, gen: function (a, p, c) { return questionComparerDecimaux(a, p, c); } },
+        { type: 'vraifaux', gen: function (a, p, c) { return vraiFauxComparer(a, p, c); } },
+        { type: 'directe', palierMin: 5, d5: true, gen: function (a) { return questionOrdonnerMixte(a); } }
       ]
     },
     {
       id: 'A9-part', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Calculer la part d\'un nombre (fraction d\'un nombre)',
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionPart(a, p); } },
+        { type: 'directe', palierMax: 4, gen: function (a, p) { return questionPart(a, p); } },
         { type: 'probleme', gen: function (a, p) { return problemePart(a, p); } },
-        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurPart(a, p); } }
+        { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurPart(a, p); } },
+        { type: 'probleme', palierMin: 5, d5: true, gen: function (a) { return problemePartDePart(a); } }
       ]
     },
     {
       id: 'A9-decimaux', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Additionner, soustraire, multiplier et diviser des nombres décimaux',
       modeles: [
-        { type: 'directe', gen: function (a, p, c) { return questionDecimaux(a, p, c); } },
+        { type: 'directe', palierMax: 4, gen: function (a, p, c) { return questionDecimaux(a, p, c); } },
         { type: 'directe', gen: function (a, p, c) { return questionDecimaux(a, p, c); } },
         { type: 'erreur', palierMin: 2, gen: function (a, p) { return erreurDecimaux(a, p); } },
         { type: 'probleme', gen: function (a, p) { return problemeMontant(a, p); } },
-        { type: 'vraifaux', gen: function (a, p) { return vraiFauxEstimation(a, p); } }
+        { type: 'vraifaux', gen: function (a, p) { return vraiFauxEstimation(a, p); } },
+        { type: 'directe', palierMin: 5, d5: true, gen: function (a) { return questionDecimaux5(a); } }
       ]
     },
     {
       id: 'A9-addsous', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Additionner et soustraire des fractions',
       modeles: [
-        { type: 'directe', gen: function (a, p) { return questionAddSous(a, p); } },
+        { type: 'directe', palierMax: 4, gen: function (a, p) { return questionAddSous(a, p); } },
         { type: 'directe', gen: function (a, p) { return questionAddSous(a, p); } },
         { type: 'erreur', gen: function (a, p) { return erreurAddition(a, p); } },
         { type: 'vraifaux', gen: function (a, p) { return vraiFauxAddition(a, p); } },
-        { type: 'probleme', gen: function (a, p) { return problemeAddition(a, p); } }
+        { type: 'probleme', gen: function (a, p) { return problemeAddition(a, p); } },
+        { type: 'directe', palierMin: 5, d5: true, gen: function (a) { return questionAddSous5(a); } }
       ]
     },
     {
       id: 'A9-problemes', module: 'A', annee: 9, niveaux: [1, 2], theme: 'NO 9.3',
       titre: 'Résoudre des problèmes (données utiles, estimation)',
       modeles: [
+        { type: 'probleme', palierMax: 4, gen: function (a, p) { return problemeDonneesUtiles(a, p); } },
         { type: 'probleme', gen: function (a, p) { return problemeDonneesUtiles(a, p); } },
-        { type: 'probleme', gen: function (a, p) { return problemeDonneesUtiles(a, p); } },
-        { type: 'probleme', palierMin: 2, gen: function (a, p) { return questionOrdreGrandeur(a, p); } }
+        { type: 'probleme', palierMin: 2, gen: function (a, p) { return questionOrdreGrandeur(a, p); } },
+        { type: 'probleme', palierMin: 5, d5: true, gen: function (a) { return problemeDeuxFractions(a); } },
+        { type: 'probleme', palierMin: 5, d5: true, gen: function (a) { return problemePartDePart(a); } }
       ]
     },
     {
@@ -1881,6 +2563,13 @@
     estimer: estimer,
     verifApprochee: verifApprochee,
     questionSimplifier: questionSimplifier,
+    questionSimplifier5: questionSimplifier5,
+    questionProduitASimplifier: questionProduitASimplifier,
+    questionSommeASimplifier: questionSommeASimplifier,
+    vraiFauxSauvage: vraiFauxSauvage,
+    BORNES_SIMPLIFIER: BORNES_SIMPLIFIER,
+    problemePartDePart: problemePartDePart,
+    problemeDeuxFractions: problemeDeuxFractions,
     questionAmplifier: questionAmplifier,
     erreurSimplifier: erreurSimplifier,
     vraiFauxIrreductible: vraiFauxIrreductible,

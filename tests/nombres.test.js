@@ -296,7 +296,11 @@ function verifierReponses(q, ident) {
  *   D1 : une opération, nombres ⩽ 20, dénominateurs ⩽ 12, résultat simple ;
  *   D2 : deux étapes, nombres ⩽ 100 ;
  *   D3 : deux à trois étapes, nombres ⩽ 200 ;
- *   D4 : trois étapes au plus, nombres ⩽ 300, jamais plus de 4 opérations.
+ *   D4 : trois étapes au plus, nombres ⩽ 300, jamais plus de 4 opérations ;
+ *   D5 (niveau 2 seulement) : quatre étapes au plus, nombres ⩽ 500, jamais plus de 6 opérations.
+ * Le curseur de l'élève (1 à 4) donne D1 à D4 au niveau 1 et D2 à D5 au niveau 2 : les bornes
+ * sont vérifiées sur le palier réellement appliqué par le générateur (q.palierGen). Une question
+ * du niveau 2 au cran d respecte donc les bornes du niveau 1 au cran d + 1, et celles de D5 au cran 4.
  * « Opérations » et « étapes » sont mesurées sur le texte de contrôle de la question
  * (arbre de calcul lu par Maths.analyser) : une étape = un niveau de l'arbre.
  * Un objectif peut déclarer des bornes propres (bornesD) quand la règle générale
@@ -304,11 +308,11 @@ function verifierReponses(q, ident) {
  * chaque exception est justifiée dans le fichier de l'objectif.
  */
 var BORNES_D = {
-  nombre: [20, 100, 200, 300],
-  den: [12, 100, 200, 300],
-  decimales: [2, 2, 3, 3],
-  operations: [1, 3, 4, 4],
-  etapes: [1, 2, 3, 3]
+  nombre: [20, 100, 200, 300, 500],
+  den: [12, 100, 200, 300, 500],
+  decimales: [2, 2, 3, 3, 3],
+  operations: [1, 3, 4, 4, 6],
+  etapes: [1, 2, 3, 3, 4]
 };
 
 function litteralEntier(n) { if (n.type === 'neg') n = n.arg; return n.type === 'nombre' && n.valeur.estEntier(); }
@@ -328,6 +332,7 @@ function textesControle(c) {
 }
 function borne(o, cle, d) {
   var b = o.bornesD && o.bornesD[cle];
+  if (b && b[d - 1] === undefined) echec('bornesD sans valeur pour ce palier', o.id + ' ' + cle + ' D' + d);
   return b ? b[d - 1] : BORNES_D[cle][d - 1];
 }
 function nbDecimales(x) {
@@ -453,6 +458,7 @@ function verifierEcriture(q, ident) {
 
 var modules = ['A', 'B', 'C'];
 var parObjectif = {};
+var parPalier = {};
 var total = 0;
 var debut = Date.now();
 var seulement = process.argv[2]; // ex. « node tests/nombres.test.js B » pour un seul module
@@ -490,11 +496,14 @@ modules.forEach(function (mod) {
             var ident = q.objectif + ' ' + annee + 'e N' + niveau + ' D' + diff + ' [' + graine + ' n°' + q.numero + ']';
             parObjectif[q.objectif] = (parObjectif[q.objectif] || 0) + 1;
             verifierQue(o.annee <= annee && o.niveaux.indexOf(niveau) >= 0, 'question hors profil', ident);
-            verifierQue(q.palier === diff, 'difficulté incorrecte', ident);
+            verifierQue(q.palier === diff + (niveau === 2 ? 1 : 0) && q.curseur === diff, 'palier incorrect', ident + ' : D' + q.palier);
+            verifierQue(q.palierGen >= 1 && q.palierGen <= q.palier, 'palier du générateur incohérent', ident + ' : ' + q.palierGen);
+            if (o.niveaux.join() === '2') verifierQue(q.palierGen === diff, 'objectif du niveau 2 : crans existants conservés', ident);
+            parPalier[q.objectif + ' D' + q.palier] = (parPalier[q.objectif + ' D' + q.palier] || 0) + 1;
             verifierQue(q.compte === !(niveau === 1 && (o.plusLoinN1 || []).indexOf(annee) >= 0), 'statut « pour aller plus loin » incorrect', ident);
             controler(q, ident);
             verifierReponses(q, ident);
-            verifierBornes(q, o, diff, ident);
+            verifierBornes(q, o, q.palierGen, ident);
             verifierContenu(q, o, profil, diff, ident);
             verifierEcriture(q, ident);
             verifierVisuels(q, ident);
@@ -512,8 +521,14 @@ Nombres.objectifs.forEach(function (o) {
   verifierQue(parObjectif[o.id] > 0, 'objectif jamais généré', o.id);
 });
 
-// La difficulté choisie est la difficulté appliquée, au niveau 1 comme au niveau 2
-verifierQue(Nombres.palier(4, 1) === 4 && Nombres.palier(4, 2) === 4 && Nombres.palier(1, 2) === 1, 'difficulté', '');
+// Paliers internes : niveau 1 = D1 à D4, niveau 2 = D2 à D5
+verifierQue(Nombres.palier(1, 1) === 1 && Nombres.palier(4, 1) === 4 && Nombres.palier(1, 2) === 2 && Nombres.palier(4, 2) === 5, 'paliers internes', '');
+// Module A (recalibré) : chaque objectif commun aux deux niveaux a de vraies questions D5
+Nombres.objectifs.forEach(function (o) {
+  if (o.module !== 'A' || o.niveaux.length < 2 || (seulement && seulement !== 'A') || process.argv[3]) return;
+  verifierQue(o.modeles.some(function (m) { return m.d5; }), 'objectif sans modèle écrit pour le palier D5', o.id);
+  verifierQue(parPalier[o.id + ' D5'] > 0, 'palier D5 jamais généré', o.id);
+});
 // Objectifs propres au niveau 2
 ['A9-pourcentages', 'B11-racine-n', 'C10-puissance'].forEach(function (id) {
   verifierQue(Nombres.parId[id] && Nombres.parId[id].niveaux.join() === '2', 'objectif censé être réservé au niveau 2', id);
